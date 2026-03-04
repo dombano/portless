@@ -275,6 +275,20 @@ ${body}
 </html>`;
 }
 
+/**
+ * Find the route matching a given host. Matches exact hostname first, then
+ * falls back to wildcard subdomain matching (e.g. tenant.myapp.localhost
+ * matches a route registered for myapp.localhost).
+ */
+function findRoute(
+  routes: { hostname: string; port: number }[],
+  host: string
+): { hostname: string; port: number } | undefined {
+  return (
+    routes.find((r) => r.hostname === host) || routes.find((r) => host.endsWith("." + r.hostname))
+  );
+}
+
 /** Server type returned by createProxyServer (plain HTTP/1.1 or net.Server TLS wrapper). */
 export type ProxyServer = http.Server | net.Server;
 
@@ -329,7 +343,7 @@ export function createProxyServer(options: ProxyServerOptions): ProxyServer {
       return;
     }
 
-    const route = routes.find((r) => r.hostname === host);
+    const route = findRoute(routes, host);
 
     if (!route) {
       const safeHost = escapeHtml(host);
@@ -444,7 +458,7 @@ export function createProxyServer(options: ProxyServerOptions): ProxyServer {
 
     const routes = getRoutes();
     const host = getRequestHost(req).split(":")[0];
-    const route = routes.find((r) => r.hostname === host);
+    const route = findRoute(routes, host);
 
     if (!route) {
       socket.destroy();
