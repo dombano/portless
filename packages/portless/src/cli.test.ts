@@ -352,4 +352,34 @@ describe("CLI", () => {
       expect(stderr).toContain("Unknown hosts subcommand");
     });
   });
+
+  describe("--name flag", () => {
+    it("treats reserved word as app name with PORTLESS=0", () => {
+      const { status, stdout } = run(["--name", "run", "echo", "ok"], {
+        env: { PORTLESS: "0" },
+      });
+      expect(status).toBe(0);
+      expect(stdout.trim()).toBe("ok");
+    });
+
+    it("passes --force through with --name (PORTLESS=0)", () => {
+      const { status, stdout } = run(["--name", "alias", "--force", "echo", "ok"], {
+        env: { PORTLESS: "0" },
+      });
+      expect(status).toBe(0);
+      expect(stdout.trim()).toBe("ok");
+    });
+
+    it("exits 1 when --name has no value", () => {
+      const { status, stderr } = run(["--name"]);
+      expect(status).toBe(1);
+      expect(stderr).toContain("--name requires");
+    });
+
+    it("exits 1 when --name has name but no command", () => {
+      const { status, stderr } = run(["--name", "myapp"]);
+      expect(status).toBe(1);
+      expect(stderr).toContain("No command provided");
+    });
+  });
 });

@@ -683,6 +683,7 @@ ${chalk.bold("Options:")}
   --foreground                  Run proxy in foreground (for debugging)
   --app-port <number>           Use a fixed port for the app (skip auto-assignment)
   --force                       Override an existing route registered by another process
+  --name <name>                 Use <name> as the app name (bypasses subcommand dispatch)
 
 ${chalk.bold("Environment variables:")}
   PORTLESS_PORT=<number>        Override the default proxy port (e.g. in .bashrc)
@@ -710,6 +711,11 @@ ${chalk.bold("Safari / DNS:")}
 ${chalk.bold("Skip portless:")}
   PORTLESS=0 pnpm dev           # Runs command directly without proxy
   PORTLESS=skip pnpm dev        # Same as above
+
+${chalk.bold("Reserved names:")}
+  run, alias, hosts, list, trust, proxy are subcommands and cannot be
+  used as app names directly. Use "portless run" to infer the name, or
+  "portless --name <name>" to force any name including reserved ones.
 `);
   process.exit(0);
 }
@@ -1196,6 +1202,30 @@ async function main() {
     console.error(chalk.blue("Install globally instead:"));
     console.error(chalk.cyan("  npm install -g portless"));
     process.exit(1);
+  }
+
+  // --name flag: treat the next arg as an explicit app name, bypassing
+  // subcommand dispatch. Useful when the app name collides with a reserved
+  // subcommand (run, alias, hosts, list, trust, proxy).
+  if (args[0] === "--name") {
+    args.shift();
+    if (!args[0]) {
+      console.error(chalk.red("Error: --name requires an app name."));
+      console.error(chalk.cyan("  portless --name <name> <command...>"));
+      process.exit(1);
+    }
+    const skipPortless = process.env.PORTLESS === "0" || process.env.PORTLESS === "skip";
+    if (skipPortless) {
+      const { commandArgs } = parseAppArgs(args);
+      if (commandArgs.length === 0) {
+        console.error(chalk.red("Error: No command provided."));
+        process.exit(1);
+      }
+      spawnCommand(commandArgs);
+      return;
+    }
+    await handleNamedMode(args);
+    return;
   }
 
   // `run` subcommand: strip it, rest is parsed as run-mode args

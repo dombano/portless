@@ -146,6 +146,7 @@ portless proxy stop              # Stop the proxy
 --foreground                     # Run proxy in foreground instead of daemon
 --app-port <number>              # Use a fixed port for the app (skip auto-assignment)
 --force                          # Override a route registered by another process
+--name <name>                    # Use <name> as the app name (bypasses subcommand dispatch)
 
 # Injected into child processes
 PORT                             # Ephemeral port the child should listen on
@@ -163,6 +164,8 @@ PORTLESS_STATE_DIR=<path>        # Override the state directory
 portless --help                  # Show help
 portless --version               # Show version
 ```
+
+> **Reserved names:** `run`, `alias`, `hosts`, `list`, `trust`, and `proxy` are subcommands and cannot be used as app names directly. Use `portless run <cmd>` to infer the name from your project, or `portless --name <name> <cmd>` to force any name including reserved ones.
 
 ## State Directory
 

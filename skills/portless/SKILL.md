@@ -140,8 +140,11 @@ First run generates a local CA and prompts for sudo to add it to the system trus
 | `portless hosts clean`                 | Remove portless entries from /etc/hosts                       |
 | `portless <name> --app-port <n> <cmd>` | Use a fixed port for the app instead of auto-assignment       |
 | `portless <name> --force <cmd>`        | Override an existing route registered by another process      |
+| `portless --name <name> <cmd>`         | Force `<name>` as app name (bypasses subcommand dispatch)     |
 | `portless --help` / `-h`               | Show help                                                     |
 | `portless --version` / `-v`            | Show version                                                  |
+
+**Reserved names:** `run`, `alias`, `hosts`, `list`, `trust`, and `proxy` are subcommands and cannot be used as app names directly. Use `portless run <cmd>` to infer the name, or `portless --name <name> <cmd>` to force any name including reserved ones.
 
 ## Troubleshooting
 
