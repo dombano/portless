@@ -124,6 +124,45 @@ export function writeTlsMarker(dir: string, enabled: boolean): void {
   }
 }
 
+/** Default TLD when PORTLESS_TLD is not set. */
+export const DEFAULT_TLD = "localhost";
+
+/** Name of the file that stores the proxy's active TLD. */
+const TLD_FILE = "proxy.tld";
+
+/** Read the TLD from a state directory. Returns DEFAULT_TLD if absent. */
+export function readTldFromDir(dir: string): string {
+  try {
+    const raw = fs.readFileSync(path.join(dir, TLD_FILE), "utf-8").trim();
+    return raw || DEFAULT_TLD;
+  } catch {
+    return DEFAULT_TLD;
+  }
+}
+
+/** Write or remove the TLD file in the state directory. */
+export function writeTldFile(dir: string, tld: string): void {
+  const filePath = path.join(dir, TLD_FILE);
+  if (tld === DEFAULT_TLD) {
+    try {
+      fs.unlinkSync(filePath);
+    } catch {
+      // File may already be absent; non-fatal
+    }
+  } else {
+    fs.writeFileSync(filePath, tld, { mode: 0o644 });
+  }
+}
+
+/**
+ * Return the effective TLD. Reads the PORTLESS_TLD env var first,
+ * falling back to DEFAULT_TLD ("localhost").
+ */
+export function getDefaultTld(): string {
+  const val = process.env.PORTLESS_TLD?.trim().toLowerCase();
+  return val || DEFAULT_TLD;
+}
+
 /**
  * Return whether HTTPS mode is requested via the PORTLESS_HTTPS env var.
  */
@@ -133,17 +172,23 @@ export function isHttpsEnvEnabled(): boolean {
 }
 
 /**
- * Discover the active proxy's state directory, port, and TLS mode.
+ * Discover the active proxy's state directory, port, TLS mode, and TLD.
  * Checks the user-level dir first, then the system-level dir.
  * Falls back to the system dir with the default port if nothing is running.
  */
-export async function discoverState(): Promise<{ dir: string; port: number; tls: boolean }> {
+export async function discoverState(): Promise<{
+  dir: string;
+  port: number;
+  tls: boolean;
+  tld: string;
+}> {
   // Env var override
   if (process.env.PORTLESS_STATE_DIR) {
     const dir = process.env.PORTLESS_STATE_DIR;
     const port = readPortFromDir(dir) ?? getDefaultPort();
     const tls = readTlsMarker(dir);
-    return { dir, port, tls };
+    const tld = readTldFromDir(dir);
+    return { dir, port, tls, tld };
   }
 
   // Check user-level state first (~/.portless)
@@ -151,7 +196,8 @@ export async function discoverState(): Promise<{ dir: string; port: number; tls:
   if (userPort !== null) {
     const tls = readTlsMarker(USER_STATE_DIR);
     if (await isProxyRunning(userPort, tls)) {
-      return { dir: USER_STATE_DIR, port: userPort, tls };
+      const tld = readTldFromDir(USER_STATE_DIR);
+      return { dir: USER_STATE_DIR, port: userPort, tls, tld };
     }
   }
 
@@ -160,13 +206,14 @@ export async function discoverState(): Promise<{ dir: string; port: number; tls:
   if (systemPort !== null) {
     const tls = readTlsMarker(SYSTEM_STATE_DIR);
     if (await isProxyRunning(systemPort, tls)) {
-      return { dir: SYSTEM_STATE_DIR, port: systemPort, tls };
+      const tld = readTldFromDir(SYSTEM_STATE_DIR);
+      return { dir: SYSTEM_STATE_DIR, port: systemPort, tls, tld };
     }
   }
 
   // Nothing running; fall back based on default port
   const defaultPort = getDefaultPort();
-  return { dir: resolveStateDir(defaultPort), port: defaultPort, tls: false };
+  return { dir: resolveStateDir(defaultPort), port: defaultPort, tls: false, tld: getDefaultTld() };
 }
 
 // ---------------------------------------------------------------------------

@@ -1,17 +1,23 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import * as fs from "node:fs";
 import * as http from "node:http";
 import * as net from "node:net";
 import * as os from "node:os";
+import * as path from "node:path";
 import {
   DEFAULT_PROXY_PORT,
+  DEFAULT_TLD,
   PRIVILEGED_PORT_THRESHOLD,
   SYSTEM_STATE_DIR,
   USER_STATE_DIR,
   findFreePort,
   getDefaultPort,
+  getDefaultTld,
   injectFrameworkFlags,
   isProxyRunning,
+  readTldFromDir,
   resolveStateDir,
+  writeTldFile,
 } from "./cli-utils.js";
 
 describe("findFreePort", () => {
@@ -279,5 +285,87 @@ describe("injectFrameworkFlags", () => {
     const args: string[] = [];
     injectFrameworkFlags(args, 4567);
     expect(args).toEqual([]);
+  });
+});
+
+describe("DEFAULT_TLD", () => {
+  it("is localhost", () => {
+    expect(DEFAULT_TLD).toBe("localhost");
+  });
+});
+
+describe("getDefaultTld", () => {
+  let originalEnv: string | undefined;
+
+  beforeEach(() => {
+    originalEnv = process.env.PORTLESS_TLD;
+  });
+
+  afterEach(() => {
+    if (originalEnv === undefined) {
+      delete process.env.PORTLESS_TLD;
+    } else {
+      process.env.PORTLESS_TLD = originalEnv;
+    }
+  });
+
+  it("returns DEFAULT_TLD when PORTLESS_TLD is not set", () => {
+    delete process.env.PORTLESS_TLD;
+    expect(getDefaultTld()).toBe(DEFAULT_TLD);
+  });
+
+  it("returns PORTLESS_TLD when set", () => {
+    process.env.PORTLESS_TLD = "test";
+    expect(getDefaultTld()).toBe("test");
+  });
+
+  it("lowercases the value", () => {
+    process.env.PORTLESS_TLD = "TEST";
+    expect(getDefaultTld()).toBe("test");
+  });
+
+  it("trims whitespace", () => {
+    process.env.PORTLESS_TLD = "  test  ";
+    expect(getDefaultTld()).toBe("test");
+  });
+
+  it("returns DEFAULT_TLD when PORTLESS_TLD is empty", () => {
+    process.env.PORTLESS_TLD = "";
+    expect(getDefaultTld()).toBe(DEFAULT_TLD);
+  });
+});
+
+describe("readTldFromDir / writeTldFile", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "portless-tld-test-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("returns DEFAULT_TLD when file does not exist", () => {
+    expect(readTldFromDir(tmpDir)).toBe(DEFAULT_TLD);
+  });
+
+  it("writes and reads a custom TLD", () => {
+    writeTldFile(tmpDir, "test");
+    expect(readTldFromDir(tmpDir)).toBe("test");
+  });
+
+  it("removes the file when writing the default TLD", () => {
+    writeTldFile(tmpDir, "test");
+    expect(fs.existsSync(path.join(tmpDir, "proxy.tld"))).toBe(true);
+
+    writeTldFile(tmpDir, DEFAULT_TLD);
+    expect(fs.existsSync(path.join(tmpDir, "proxy.tld"))).toBe(false);
+    expect(readTldFromDir(tmpDir)).toBe(DEFAULT_TLD);
+  });
+
+  it("handles removing the default TLD file when it does not exist", () => {
+    writeTldFile(tmpDir, DEFAULT_TLD);
+    expect(readTldFromDir(tmpDir)).toBe(DEFAULT_TLD);
   });
 });

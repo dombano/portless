@@ -121,6 +121,7 @@ Override with the `PORTLESS_STATE_DIR` environment variable.
 | `PORTLESS_PORT`       | Override the default proxy port (default: 1355)       |
 | `PORTLESS_APP_PORT`   | Use a fixed port for the app (skip auto-assignment)   |
 | `PORTLESS_HTTPS`      | Set to `1` or `true` to always enable HTTPS/HTTP/2    |
+| `PORTLESS_TLD`        | Use a custom TLD instead of localhost (e.g. test)     |
 | `PORTLESS_SYNC_HOSTS` | Set to `1` to auto-sync /etc/hosts when routes change |
 | `PORTLESS_STATE_DIR`  | Override the state directory                          |
 | `PORTLESS=0\|skip`    | Bypass the proxy, run the command directly            |
@@ -150,6 +151,7 @@ On Linux, `portless trust` supports Debian/Ubuntu, Arch, Fedora/RHEL/CentOS, and
 | `portless proxy start`                 | Start the proxy as a daemon (port 1355, no sudo)              |
 | `portless proxy start --https`         | Start with HTTP/2 + TLS (auto-generates certs)                |
 | `portless proxy start -p <number>`     | Start the proxy on a custom port                              |
+| `portless proxy start --tld test`      | Use .test instead of .localhost (requires /etc/hosts sync)    |
 | `portless proxy start --foreground`    | Start the proxy in foreground (for debugging)                 |
 | `portless proxy stop`                  | Stop the proxy                                                |
 | `portless alias <name> <port>`         | Register a static route (e.g. for Docker containers)          |

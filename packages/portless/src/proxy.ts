@@ -97,7 +97,14 @@ export type ProxyServer = http.Server | net.Server;
  * browsers while keeping WebSocket upgrades working over HTTP/1.1.
  */
 export function createProxyServer(options: ProxyServerOptions): ProxyServer {
-  const { getRoutes, proxyPort, onError = (msg: string) => console.error(msg), tls } = options;
+  const {
+    getRoutes,
+    proxyPort,
+    tld = "localhost",
+    onError = (msg: string) => console.error(msg),
+    tls,
+  } = options;
+  const tldSuffix = `.${tld}`;
 
   const isTls = !!tls;
 
@@ -127,7 +134,7 @@ export function createProxyServer(options: ProxyServerOptions): ProxyServer {
           "Loop Detected",
           `<div class="content"><p class="desc">This request has passed through portless ${hops} times. This usually means a dev server (Vite, webpack, etc.) is proxying requests back through portless without rewriting the Host header.</p><div class="section"><p class="label">Fix: add changeOrigin to your proxy config</p><pre class="terminal">proxy: {
   "/api": {
-    target: "http://&lt;backend&gt;.localhost:&lt;port&gt;",
+    target: "http://&lt;backend&gt;${escapeHtml(tldSuffix)}:&lt;port&gt;",
     changeOrigin: true,
   },
 }</pre></div></div>`
@@ -149,7 +156,7 @@ export function createProxyServer(options: ProxyServerOptions): ProxyServer {
         renderPage(
           404,
           "Not Found",
-          `<div class="content"><p class="desc">No app registered for <strong>${safeHost}</strong></p>${routesList}<div class="section"><div class="terminal"><span class="prompt">$ </span>portless ${safeHost.replace(".localhost", "")} your-command</div></div></div>`
+          `<div class="content"><p class="desc">No app registered for <strong>${safeHost}</strong></p>${routesList}<div class="section"><div class="terminal"><span class="prompt">$ </span>portless ${safeHost.replace(escapeHtml(tldSuffix), "")} your-command</div></div></div>`
         )
       );
       return;

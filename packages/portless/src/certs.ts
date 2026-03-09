@@ -554,21 +554,22 @@ async function generateHostCertAsync(
 export function createSNICallback(
   stateDir: string,
   defaultCert: Buffer,
-  defaultKey: Buffer
+  defaultKey: Buffer,
+  tld = "localhost"
 ): (servername: string, cb: (err: Error | null, ctx?: tls.SecureContext) => void) => void {
   const cache = new Map<string, tls.SecureContext>();
   const pending = new Map<string, Promise<tls.SecureContext>>();
 
-  // Pre-cache the default context for "localhost" itself
+  // Pre-cache the default context for the bare TLD itself
   const defaultCtx = tls.createSecureContext({ cert: defaultCert, key: defaultKey });
 
   return (servername: string, cb: (err: Error | null, ctx?: tls.SecureContext) => void) => {
-    // Only bare "localhost" uses the default cert. All subdomains (including
-    // single-level ones like "tools.localhost") need a cert with an exact SAN.
-    // RFC 2606 §2 designates ".localhost" as a reserved TLD, so "*.localhost"
-    // sits at the public-suffix boundary -- TLS specs do not permit wildcard
-    // certificates at that level.
-    if (servername === "localhost") {
+    // The bare TLD (e.g. "localhost" or "test") uses the default cert.
+    // All subdomains need a cert with an exact SAN entry.
+    // For .localhost: RFC 2606 §2 designates it as a reserved TLD, so
+    // "*.localhost" sits at the public-suffix boundary and TLS specs do
+    // not permit wildcard certificates at that level.
+    if (servername === tld) {
       cb(null, defaultCtx);
       return;
     }

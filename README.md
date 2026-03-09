@@ -172,6 +172,7 @@ portless proxy stop              # Stop the proxy
 --key <path>                     # Use a custom TLS private key (implies --https)
 --no-tls                         # Disable HTTPS (overrides PORTLESS_HTTPS)
 --foreground                     # Run proxy in foreground instead of daemon
+--tld <tld>                      # Use a custom TLD instead of .localhost (e.g. test)
 --app-port <number>              # Use a fixed port for the app (skip auto-assignment)
 --force                          # Override a route registered by another process
 --name <name>                    # Use <name> as the app name (bypasses subcommand dispatch)
@@ -186,6 +187,7 @@ PORTLESS_URL                     # Public URL (e.g. http://myapp.localhost:1355)
 PORTLESS_PORT=<number>           # Override the default proxy port
 PORTLESS_APP_PORT=<number>       # Use a fixed port for the app (same as --app-port)
 PORTLESS_HTTPS=1|true            # Always enable HTTPS
+PORTLESS_TLD=<tld>               # Use a custom TLD (e.g. test; default: localhost)
 PORTLESS_SYNC_HOSTS=1            # Auto-sync /etc/hosts when routes change
 PORTLESS_STATE_DIR=<path>        # Override the state directory
 
@@ -241,6 +243,33 @@ To auto-sync `/etc/hosts` whenever routes change, set `PORTLESS_SYNC_HOSTS=1` an
 export PORTLESS_SYNC_HOSTS=1
 sudo portless proxy start
 ```
+
+## Custom TLD
+
+By default, portless uses `.localhost` which auto-resolves to `127.0.0.1` in most browsers without any setup. If you prefer a different TLD (e.g. `.test`), configure it via `--tld` or the `PORTLESS_TLD` env var:
+
+```bash
+# Start the proxy with a custom TLD
+portless proxy start --tld test
+
+# Or set it permanently (add to .bashrc / .zshrc)
+export PORTLESS_TLD=test
+portless proxy start
+```
+
+Custom TLDs require `/etc/hosts` entries to resolve to `127.0.0.1`. Enable auto-sync so portless manages this for you:
+
+```bash
+export PORTLESS_TLD=test
+export PORTLESS_SYNC_HOSTS=1
+sudo portless proxy start
+
+# Apps now use .test URLs:
+portless myapp next dev
+# -> http://myapp.test:1355
+```
+
+Recommended TLDs: `.test` (IANA-reserved for testing, no collision risk). Avoid `.local` (conflicts with mDNS/Bonjour) and `.dev` (Google-owned, forces HTTPS via HSTS).
 
 ## Proxying Between Portless Apps
 

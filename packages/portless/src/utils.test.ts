@@ -156,4 +156,38 @@ describe("parseHostname", () => {
     const longLabel = "a".repeat(64);
     expect(() => parseHostname(`prefix.${longLabel}`)).toThrow("exceeds 63-character DNS limit");
   });
+
+  describe("custom TLD", () => {
+    it("appends custom TLD suffix", () => {
+      expect(parseHostname("myapp", "test")).toBe("myapp.test");
+    });
+
+    it("preserves existing custom TLD suffix", () => {
+      expect(parseHostname("myapp.test", "test")).toBe("myapp.test");
+    });
+
+    it("does not append if wrong TLD suffix", () => {
+      expect(parseHostname("myapp.localhost", "test")).toBe("myapp.localhost.test");
+    });
+
+    it("handles subdomain with custom TLD", () => {
+      expect(parseHostname("api.myapp", "test")).toBe("api.myapp.test");
+    });
+
+    it("throws on empty input with custom TLD", () => {
+      expect(() => parseHostname("", "test")).toThrow("Hostname cannot be empty");
+    });
+
+    it("throws on bare TLD suffix", () => {
+      expect(() => parseHostname(".test", "test")).toThrow("Hostname cannot be empty");
+    });
+
+    it("validates characters with custom TLD", () => {
+      expect(() => parseHostname("my app", "test")).toThrow("Invalid hostname");
+    });
+
+    it("works with dev TLD", () => {
+      expect(parseHostname("myapp", "dev")).toBe("myapp.dev");
+    });
+  });
 });
