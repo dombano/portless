@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.0
+
+### Features
+
+- **custom TLD**: Use `--tld` to set a custom TLD (e.g. `.test`) instead of `.localhost`. Configurable via `PORTLESS_TLD` env var. The proxy auto-syncs `/etc/hosts` for custom TLDs when started with sudo. Warns about risky TLDs like `.local` (mDNS/Bonjour conflicts) and `.dev` (Google-owned, HSTS). Recommended: `.test` (IANA-reserved, no collision risk). (#93)
+- **`portless get` command**: Print the URL for a service, useful for wiring services together (e.g. `BACKEND_URL=$(portless get backend)`). Applies worktree prefix detection by default; use `--no-worktree` to skip it. (#88)
+- **`--name` flag for `portless run`**: Override the inferred base name while preserving the worktree prefix (e.g. `portless run --name myapp next dev` in a worktree produces `fix-ui.myapp.localhost`). (#89)
+
+### Bug Fixes
+
+- **HTTPS proxy trust and stop on macOS with sudo**: Fix CA trust check and `proxy stop` when the proxy was started with sudo on macOS. (#98)
+- **DNS label length for worktree hostnames**: Truncate worktree-prefixed hostnames to respect the 63-character DNS label limit. (#87)
+
 ## 0.5.2
 
 ### Documentation

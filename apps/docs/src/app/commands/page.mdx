@@ -19,6 +19,59 @@ portless api pnpm start
 portless docs.myapp next dev
 ```
 
+<table>
+  <thead>
+    <tr>
+      <th>Flag</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`--name <name>`</td>
+      <td>Override the inferred base name (worktree prefix still applies). Only for `portless run`.</td>
+    </tr>
+    <tr>
+      <td>`--app-port <number>`</td>
+      <td>Use a fixed port for the app instead of auto-assignment. Also configurable via `PORTLESS_APP_PORT`.</td>
+    </tr>
+    <tr>
+      <td>`--force`</td>
+      <td>Override an existing route registered by another process</td>
+    </tr>
+  </tbody>
+</table>
+
+## Get a service URL
+
+```bash
+portless get <name>
+```
+
+Print the URL for a service. Useful for wiring services together in scripts or env vars:
+
+```bash
+BACKEND_URL=$(portless get backend)
+```
+
+Applies worktree prefix detection by default. Use `--no-worktree` to skip it.
+
+## Alias (static routes)
+
+```bash
+portless alias <name> <port>
+portless alias <name> <port> --force
+portless alias --remove <name>
+```
+
+Register a route for a service not managed by portless (e.g. a Docker container). Aliases persist across stale-route cleanup.
+
+```bash
+portless alias my-postgres 5432     # -> http://my-postgres.localhost:1355
+portless alias redis 6379           # -> http://redis.localhost:1355
+portless alias --remove my-postgres # remove the alias
+```
+
 ## List routes
 
 ```bash
@@ -60,6 +113,10 @@ portless proxy start
       <td>Enable HTTP/2 + TLS with auto-generated certs</td>
     </tr>
     <tr>
+      <td>`--tld <tld>`</td>
+      <td>Use a custom TLD instead of `.localhost` (e.g. `test`). Auto-syncs `/etc/hosts` for custom TLDs.</td>
+    </tr>
+    <tr>
       <td>`--cert <path>`</td>
       <td>Custom TLS certificate (implies `--https`)</td>
     </tr>
@@ -83,6 +140,15 @@ portless proxy start
 ```bash
 portless proxy stop
 ```
+
+## Hosts
+
+```bash
+sudo portless hosts sync     # add current routes to /etc/hosts
+sudo portless hosts clean    # remove portless entries from /etc/hosts
+```
+
+Auto-enabled for custom TLDs. For `.localhost`, set `PORTLESS_SYNC_HOSTS=1` to enable.
 
 ## Bypass portless
 
