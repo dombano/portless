@@ -149,8 +149,11 @@ export async function discoverState(): Promise<{ dir: string; port: number; tls:
   // Check user-level state first (~/.portless)
   const userPort = readPortFromDir(USER_STATE_DIR);
   if (userPort !== null) {
-    const tls = readTlsMarker(USER_STATE_DIR);
-    if (await isProxyRunning(userPort, tls)) {
+    // Always use plain HTTP for the liveness check. The TLS-enabled proxy
+    // accepts plain HTTP via byte-peeking, so this works for both modes and
+    // avoids TLS handshake timeouts that can cause false negatives.
+    if (await isProxyRunning(userPort)) {
+      const tls = readTlsMarker(USER_STATE_DIR);
       return { dir: USER_STATE_DIR, port: userPort, tls };
     }
   }
@@ -158,14 +161,25 @@ export async function discoverState(): Promise<{ dir: string; port: number; tls:
   // Check system-level state (/tmp/portless)
   const systemPort = readPortFromDir(SYSTEM_STATE_DIR);
   if (systemPort !== null) {
-    const tls = readTlsMarker(SYSTEM_STATE_DIR);
-    if (await isProxyRunning(systemPort, tls)) {
+    if (await isProxyRunning(systemPort)) {
+      const tls = readTlsMarker(SYSTEM_STATE_DIR);
       return { dir: SYSTEM_STATE_DIR, port: systemPort, tls };
     }
   }
 
-  // Nothing running; fall back based on default port
+  // State files didn't help. Probe well-known ports as a last resort --
+  // privileged-port proxies store state in /tmp which macOS cleans on reboot,
+  // so the daemon may still be alive after the port file is gone.
   const defaultPort = getDefaultPort();
+  const probePorts = new Set([defaultPort, 443, 80]);
+  for (const port of probePorts) {
+    if (await isProxyRunning(port)) {
+      const dir = resolveStateDir(port);
+      const tls = readTlsMarker(dir);
+      return { dir, port, tls };
+    }
+  }
+
   return { dir: resolveStateDir(defaultPort), port: defaultPort, tls: false };
 }
 
