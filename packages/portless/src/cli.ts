@@ -87,7 +87,7 @@ function startProxyServer(
   const autoSyncHosts =
     syncVal === "1" ||
     syncVal === "true" ||
-    (tld !== "localhost" && syncVal !== "0" && syncVal !== "false");
+    (tld !== DEFAULT_TLD && syncVal !== "0" && syncVal !== "false");
 
   const reloadRoutes = () => {
     try {
@@ -334,7 +334,13 @@ async function runApp(
 ) {
   const hostname = parseHostname(name, tld);
 
-  const envTld = getDefaultTld();
+  let envTld: string;
+  try {
+    envTld = getDefaultTld();
+  } catch (err) {
+    console.error(chalk.red(`Error: ${(err as Error).message}`));
+    process.exit(1);
+  }
   if (envTld !== DEFAULT_TLD && envTld !== tld) {
     console.warn(
       chalk.yellow(
@@ -1061,7 +1067,13 @@ ${chalk.bold("Usage:")}
   }
 
   // Parse --tld flag
-  let tld = getDefaultTld();
+  let tld: string;
+  try {
+    tld = getDefaultTld();
+  } catch (err) {
+    console.error(chalk.red(`Error: ${(err as Error).message}`));
+    process.exit(1);
+  }
   const tldIdx = args.indexOf("--tld");
   if (tldIdx !== -1) {
     const tldValue = args[tldIdx + 1];
