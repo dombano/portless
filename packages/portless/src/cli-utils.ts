@@ -127,6 +127,30 @@ export function writeTlsMarker(dir: string, enabled: boolean): void {
 /** Default TLD when PORTLESS_TLD is not set. */
 export const DEFAULT_TLD = "localhost";
 
+/** Public TLDs that must never be used (traffic would leak to the real domain). */
+const BLOCKED_TLDS = new Set(["com", "org", "net", "io", "app", "edu", "gov", "mil", "int"]);
+
+/** TLDs that work but have known pitfalls worth warning about. */
+export const RISKY_TLDS = new Map<string, string>([
+  ["local", "conflicts with mDNS/Bonjour on macOS"],
+  ["dev", "Google-owned; browsers force HTTPS via preloaded HSTS"],
+]);
+
+/**
+ * Validate a TLD string. Returns an error message if invalid, or null if OK.
+ * Does not check for risky TLDs (those produce warnings, not errors).
+ */
+export function validateTld(tld: string): string | null {
+  if (!tld) return "TLD cannot be empty";
+  if (!/^[a-z0-9]+$/.test(tld)) {
+    return `Invalid TLD "${tld}": must contain only lowercase letters and digits`;
+  }
+  if (BLOCKED_TLDS.has(tld)) {
+    return `TLD ".${tld}" is a public TLD and cannot be used (traffic would leak to the real domain)`;
+  }
+  return null;
+}
+
 /** Name of the file that stores the proxy's active TLD. */
 const TLD_FILE = "proxy.tld";
 
@@ -156,11 +180,14 @@ export function writeTldFile(dir: string, tld: string): void {
 
 /**
  * Return the effective TLD. Reads the PORTLESS_TLD env var first,
- * falling back to DEFAULT_TLD ("localhost").
+ * falling back to DEFAULT_TLD ("localhost"). Throws on invalid values.
  */
 export function getDefaultTld(): string {
   const val = process.env.PORTLESS_TLD?.trim().toLowerCase();
-  return val || DEFAULT_TLD;
+  if (!val) return DEFAULT_TLD;
+  const err = validateTld(val);
+  if (err) throw new Error(`PORTLESS_TLD: ${err}`);
+  return val;
 }
 
 /**

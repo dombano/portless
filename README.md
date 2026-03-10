@@ -18,18 +18,15 @@ npm install -g portless
 ## Run your app
 
 ```bash
-portless myapp next dev
-# -> http://myapp.localhost:1355
+# Enable HTTPS (one-time setup, auto-generates certs)
+portless proxy start --https
 
-# HTTPS on port 443 (default with --https)
-sudo portless proxy start --https
 portless myapp next dev
 # -> https://myapp.localhost
 
-# HTTP on port 80
-sudo portless proxy start -p 80
+# Without --https, runs on port 1355
 portless myapp next dev
-# -> http://myapp.localhost
+# -> http://myapp.localhost:1355
 ```
 
 The proxy auto-starts when you run an app. A random port (4000--4999) is assigned via the `PORT` environment variable. Most frameworks (Next.js, Express, Nuxt, etc.) respect this automatically. For frameworks that ignore `PORT` (Vite, Astro, React Router, Angular), portless auto-injects `--port` and `--host` flags.
@@ -82,7 +79,7 @@ portless myapp next dev
 # -> https://myapp.test
 ```
 
-The proxy auto-syncs `/etc/hosts` when started with sudo, so `.test` domains resolve correctly.
+The proxy auto-syncs `/etc/hosts` for custom TLDs when started with sudo, so `.test` domains resolve correctly.
 
 Recommended: `.test` (IANA-reserved, no collision risk). Avoid `.local` (conflicts with mDNS/Bonjour) and `.dev` (Google-owned, forces HTTPS via HSTS).
 
@@ -110,15 +107,14 @@ Enable HTTP/2 for faster dev server page loads. Browsers limit HTTP/1.1 to 6 con
 
 ```bash
 # Start with HTTPS/2 -- generates certs and trusts them automatically
-# Defaults to port 443 (requires sudo)
-sudo portless proxy start --https
+portless proxy start --https
 
 # First run prompts for sudo once to add the CA to your system trust store.
 # After that, no prompts. No browser warnings.
 
 # Make it permanent (add to .bashrc / .zshrc)
 export PORTLESS_HTTPS=1
-sudo portless proxy start    # HTTPS on port 443 by default
+portless proxy start    # HTTPS by default now
 
 # Use your own certs (e.g., from mkcert)
 portless proxy start --cert ./cert.pem --key ./key.pem
@@ -147,7 +143,7 @@ PORTLESS=0 pnpm dev              # Bypasses proxy, uses default port
 
 # Proxy control
 portless proxy start             # Start the proxy (port 1355, daemon)
-portless proxy start --https     # Start with HTTP/2 + TLS (port 443)
+portless proxy start --https     # Start with HTTP/2 + TLS
 portless proxy start -p 80       # Start on port 80 (requires sudo)
 portless proxy start --foreground  # Start in foreground (for debugging)
 portless proxy stop              # Stop the proxy
@@ -156,8 +152,8 @@ portless proxy stop              # Stop the proxy
 ### Options
 
 ```
--p, --port <number>              Port for the proxy (default: 1355, or 443 with --https)
---https                          Enable HTTP/2 + TLS (default port: 443)
+-p, --port <number>              Port for the proxy (default: 1355)
+--https                          Enable HTTP/2 + TLS with auto-generated certs
 --cert <path>                    Use a custom TLS certificate (implies --https)
 --key <path>                     Use a custom TLS private key (implies --https)
 --no-tls                         Disable HTTPS (overrides PORTLESS_HTTPS)
@@ -176,7 +172,7 @@ PORTLESS_PORT=<number>           Override the default proxy port
 PORTLESS_APP_PORT=<number>       Use a fixed port for the app (same as --app-port)
 PORTLESS_HTTPS=1|true            Always enable HTTPS
 PORTLESS_TLD=<tld>               Use a custom TLD (e.g. test; default: localhost)
-PORTLESS_SYNC_HOSTS=0            Disable auto-sync of /etc/hosts (enabled by default)
+PORTLESS_SYNC_HOSTS=1            Auto-sync /etc/hosts (auto-enabled for custom TLDs)
 PORTLESS_STATE_DIR=<path>        Override the state directory
 
 # Injected into child processes
@@ -198,7 +194,7 @@ sudo portless hosts sync    # Add current routes to /etc/hosts
 sudo portless hosts clean   # Clean up later
 ```
 
-The proxy auto-syncs `/etc/hosts` whenever routes change (when started with sudo). To disable auto-sync, set `PORTLESS_SYNC_HOSTS=0`.
+Auto-syncs `/etc/hosts` for custom TLDs (e.g. `--tld test`). For `.localhost`, set `PORTLESS_SYNC_HOSTS=1` to enable. Disable with `PORTLESS_SYNC_HOSTS=0`.
 
 ## Proxying Between Portless Apps
 

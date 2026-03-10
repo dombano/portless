@@ -147,6 +147,8 @@ export function createProxyServer(options: ProxyServerOptions): ProxyServer {
 
     if (!route) {
       const safeHost = escapeHtml(host);
+      const strippedHost = host.endsWith(tldSuffix) ? host.slice(0, -tldSuffix.length) : host;
+      const safeSuggestion = escapeHtml(strippedHost);
       const routesList =
         routes.length > 0
           ? `<div class="section"><p class="label">Active apps</p><ul class="card">${routes.map((r) => `<li><a href="${escapeHtml(formatUrl(r.hostname, proxyPort, isTls))}" class="card-link"><span class="name">${escapeHtml(r.hostname)}</span><span class="meta"><code class="port">localhost:${escapeHtml(String(r.port))}</code><span class="arrow">${ARROW_SVG}</span></span></a></li>`).join("")}</ul></div>`
@@ -156,7 +158,7 @@ export function createProxyServer(options: ProxyServerOptions): ProxyServer {
         renderPage(
           404,
           "Not Found",
-          `<div class="content"><p class="desc">No app registered for <strong>${safeHost}</strong></p>${routesList}<div class="section"><div class="terminal"><span class="prompt">$ </span>portless ${safeHost.replace(escapeHtml(tldSuffix), "")} your-command</div></div></div>`
+          `<div class="content"><p class="desc">No app registered for <strong>${safeHost}</strong></p>${routesList}<div class="section"><div class="terminal"><span class="prompt">$ </span>portless ${safeSuggestion} your-command</div></div></div>`
         )
       );
       return;

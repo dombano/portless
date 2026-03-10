@@ -17,6 +17,7 @@ import {
   isProxyRunning,
   readTldFromDir,
   resolveStateDir,
+  validateTld,
   writeTldFile,
 } from "./cli-utils.js";
 
@@ -367,5 +368,37 @@ describe("readTldFromDir / writeTldFile", () => {
   it("handles removing the default TLD file when it does not exist", () => {
     writeTldFile(tmpDir, DEFAULT_TLD);
     expect(readTldFromDir(tmpDir)).toBe(DEFAULT_TLD);
+  });
+});
+
+describe("validateTld", () => {
+  it("returns null for valid TLDs", () => {
+    expect(validateTld("localhost")).toBeNull();
+    expect(validateTld("test")).toBeNull();
+    expect(validateTld("internal")).toBeNull();
+  });
+
+  it("rejects empty string", () => {
+    expect(validateTld("")).toMatch(/cannot be empty/);
+  });
+
+  it("rejects TLDs with invalid characters", () => {
+    expect(validateTld("my-tld")).toMatch(/must contain only/);
+    expect(validateTld("my.tld")).toMatch(/must contain only/);
+    expect(validateTld("MY_TLD")).toMatch(/must contain only/);
+    expect(validateTld("tld!")).toMatch(/must contain only/);
+  });
+
+  it("rejects public TLDs", () => {
+    expect(validateTld("com")).toMatch(/public TLD/);
+    expect(validateTld("org")).toMatch(/public TLD/);
+    expect(validateTld("net")).toMatch(/public TLD/);
+    expect(validateTld("io")).toMatch(/public TLD/);
+    expect(validateTld("app")).toMatch(/public TLD/);
+  });
+
+  it("allows risky TLDs (they produce warnings elsewhere)", () => {
+    expect(validateTld("local")).toBeNull();
+    expect(validateTld("dev")).toBeNull();
   });
 });

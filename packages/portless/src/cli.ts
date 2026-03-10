@@ -15,6 +15,7 @@ import { inferProjectName, detectWorktreePrefix } from "./auto.js";
 import {
   DEFAULT_TLD,
   PRIVILEGED_PORT_THRESHOLD,
+  RISKY_TLDS,
   discoverState,
   findFreePort,
   findPidOnPort,
@@ -28,6 +29,7 @@ import {
   readTlsMarker,
   resolveStateDir,
   spawnCommand,
+  validateTld,
   waitForProxy,
   writeTldFile,
   writeTlsMarker,
@@ -82,7 +84,10 @@ function startProxyServer(
   let pollingInterval: ReturnType<typeof setInterval> | null = null;
 
   const syncVal = process.env.PORTLESS_SYNC_HOSTS;
-  const autoSyncHosts = syncVal !== "0" && syncVal !== "false";
+  const autoSyncHosts =
+    syncVal === "1" ||
+    syncVal === "true" ||
+    (tld !== "localhost" && syncVal !== "0" && syncVal !== "false");
 
   const reloadRoutes = () => {
     try {
@@ -170,7 +175,11 @@ function startProxyServer(
       // Port file may already be removed; non-fatal
     }
     writeTlsMarker(store.dir, false);
-    writeTldFile(store.dir, DEFAULT_TLD);
+    try {
+      fs.unlinkSync(path.join(store.dir, "proxy.tld"));
+    } catch {
+      // TLD file may already be removed; non-fatal
+    }
     if (autoSyncHosts) cleanHostsFile();
     server.close(() => process.exit(0));
     // Force exit after a short timeout in case connections don't drain
@@ -695,9 +704,9 @@ ${chalk.bold("HTTP/2 + HTTPS:")}
 ${chalk.bold("Options:")}
   run <cmd>                      Infer project name from package.json / git / cwd
                                 Adds worktree prefix in git worktrees
-  -p, --port <number>           Port for the proxy to listen on (default: 1355, or 443 with --https)
+  -p, --port <number>           Port for the proxy to listen on (default: 1355)
                                 Ports < 1024 require sudo
-  --https                       Enable HTTP/2 + TLS with auto-generated certs (default port: 443)
+  --https                       Enable HTTP/2 + TLS with auto-generated certs
   --cert <path>                 Use a custom TLS certificate (implies --https)
   --key <path>                  Use a custom TLS private key (implies --https)
   --no-tls                      Disable HTTPS (overrides PORTLESS_HTTPS)
@@ -713,7 +722,7 @@ ${chalk.bold("Environment variables:")}
   PORTLESS_APP_PORT=<number>    Use a fixed port for the app (same as --app-port)
   PORTLESS_HTTPS=1|true         Always enable HTTPS (set in .bashrc / .zshrc)
   PORTLESS_TLD=<tld>            Use a custom TLD (e.g. test, dev; default: localhost)
-  PORTLESS_SYNC_HOSTS=0         Disable auto-sync of /etc/hosts (enabled by default)
+  PORTLESS_SYNC_HOSTS=1         Auto-sync /etc/hosts (auto-enabled for custom TLDs)
   PORTLESS_STATE_DIR=<path>     Override the state directory
   PORTLESS=0 | PORTLESS=skip    Run command directly without proxy
 
@@ -725,11 +734,11 @@ ${chalk.bold("Child process environment:")}
 ${chalk.bold("Safari / DNS:")}
   .localhost subdomains auto-resolve in Chrome, Firefox, and Edge.
   Safari relies on the system DNS resolver, which may not handle them.
-  The proxy auto-syncs /etc/hosts when started with sudo. To manually sync:
+  Auto-syncs /etc/hosts for custom TLDs (e.g. --tld test). For .localhost,
+  set PORTLESS_SYNC_HOSTS=1 to enable. To manually sync:
     ${chalk.cyan("sudo portless hosts sync")}
   Clean up later with:
     ${chalk.cyan("sudo portless hosts clean")}
-  To disable auto-sync, set PORTLESS_SYNC_HOSTS=0.
 
 ${chalk.bold("Skip portless:")}
   PORTLESS=0 pnpm dev           # Runs command directly without proxy
@@ -912,8 +921,8 @@ ${chalk.bold("Usage:")}
   ${chalk.cyan("sudo portless hosts clean")}   Remove portless entries from /etc/hosts
 
 ${chalk.bold("Auto-sync:")}
-  The proxy auto-syncs /etc/hosts whenever routes change (requires sudo).
-  To disable, set PORTLESS_SYNC_HOSTS=0.
+  Auto-enabled for custom TLDs (e.g. --tld test). For .localhost, set
+  PORTLESS_SYNC_HOSTS=1 to enable. Disable with PORTLESS_SYNC_HOSTS=0.
 `);
     process.exit(0);
   }
@@ -1023,10 +1032,6 @@ ${chalk.bold("Usage:")}
   const hasHttpsFlag = args.includes("--https");
   const wantHttps = !hasNoTls && (hasHttpsFlag || isHttpsEnvEnabled());
 
-  if (wantHttps && portFlagIndex === -1 && !process.env.PORTLESS_PORT) {
-    proxyPort = 443;
-  }
-
   // Parse optional --cert / --key for custom certificates
   let customCertPath: string | null = null;
   let customKeyPath: string | null = null;
@@ -1061,6 +1066,15 @@ ${chalk.bold("Usage:")}
       process.exit(1);
     }
     tld = tldValue.trim().toLowerCase();
+    const tldErr = validateTld(tld);
+    if (tldErr) {
+      console.error(chalk.red(`Error: ${tldErr}`));
+      process.exit(1);
+    }
+  }
+  const riskyReason = RISKY_TLDS.get(tld);
+  if (riskyReason) {
+    console.warn(chalk.yellow(`Warning: .${tld} -- ${riskyReason}`));
   }
 
   const syncDisabled =

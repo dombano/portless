@@ -116,22 +116,22 @@ Override with the `PORTLESS_STATE_DIR` environment variable.
 
 ### Environment variables
 
-| Variable              | Description                                                        |
-| --------------------- | ------------------------------------------------------------------ |
-| `PORTLESS_PORT`       | Override the default proxy port (default: 1355, or 443 with HTTPS) |
-| `PORTLESS_APP_PORT`   | Use a fixed port for the app (skip auto-assignment)                |
-| `PORTLESS_HTTPS`      | Set to `1` or `true` to always enable HTTPS/HTTP/2                 |
-| `PORTLESS_TLD`        | Use a custom TLD instead of localhost (e.g. test)                  |
-| `PORTLESS_SYNC_HOSTS` | Set to `0` to disable auto-sync of /etc/hosts (enabled by default) |
-| `PORTLESS_STATE_DIR`  | Override the state directory                                       |
-| `PORTLESS=0\|skip`    | Bypass the proxy, run the command directly                         |
+| Variable              | Description                                                       |
+| --------------------- | ----------------------------------------------------------------- |
+| `PORTLESS_PORT`       | Override the default proxy port (default: 1355)                   |
+| `PORTLESS_APP_PORT`   | Use a fixed port for the app (skip auto-assignment)               |
+| `PORTLESS_HTTPS`      | Set to `1` or `true` to always enable HTTPS/HTTP/2                |
+| `PORTLESS_TLD`        | Use a custom TLD instead of localhost (e.g. test)                 |
+| `PORTLESS_SYNC_HOSTS` | Set to `1` to auto-sync /etc/hosts (auto-enabled for custom TLDs) |
+| `PORTLESS_STATE_DIR`  | Override the state directory                                      |
+| `PORTLESS=0\|skip`    | Bypass the proxy, run the command directly                        |
 
 ### HTTP/2 + HTTPS
 
-Use `--https` for HTTP/2 multiplexing (faster page loads for dev servers with many files). Defaults to port 443 (requires sudo):
+Use `--https` for HTTP/2 multiplexing (faster page loads for dev servers with many files):
 
 ```bash
-sudo portless proxy start --https             # Auto-generate certs, port 443
+portless proxy start --https                  # Auto-generate certs and trust CA
 portless proxy start --cert ./c.pem --key ./k.pem  # Use custom certs
 sudo portless trust                           # Add CA to trust store later
 ```
@@ -149,7 +149,7 @@ On Linux, `portless trust` supports Debian/Ubuntu, Arch, Fedora/RHEL/CentOS, and
 | `portless list`                        | Show active routes                                            |
 | `portless trust`                       | Add local CA to system trust store (for HTTPS)                |
 | `portless proxy start`                 | Start the proxy as a daemon (port 1355, no sudo)              |
-| `portless proxy start --https`         | Start with HTTP/2 + TLS on port 443 (requires sudo)           |
+| `portless proxy start --https`         | Start with HTTP/2 + TLS (auto-generates certs)                |
 | `portless proxy start -p <number>`     | Start the proxy on a custom port                              |
 | `portless proxy start --tld test`      | Use .test instead of .localhost (requires /etc/hosts sync)    |
 | `portless proxy start --foreground`    | Start the proxy in foreground (for debugging)                 |
@@ -198,7 +198,7 @@ For other frameworks that don't read `PORT`, pass the port manually:
 
 ### Permission errors
 
-Ports below 1024 require `sudo`. The default port (1355) does not need sudo, but `--https` defaults to port 443 which does. If you want to use port 80:
+Ports below 1024 require `sudo`. The default port (1355) does not need sudo. If you want to use port 80:
 
 ```bash
 sudo portless proxy start -p 80       # Port 80, requires sudo
@@ -217,7 +217,7 @@ sudo portless hosts sync    # Adds current routes to /etc/hosts
 sudo portless hosts clean   # Remove entries later
 ```
 
-The proxy auto-syncs `/etc/hosts` whenever routes change (when started with sudo). To disable, set `PORTLESS_SYNC_HOSTS=0`.
+Auto-syncs `/etc/hosts` for custom TLDs (e.g. `--tld test`). For `.localhost`, set `PORTLESS_SYNC_HOSTS=1` to enable.
 
 ### Browser shows certificate warning with --https
 
