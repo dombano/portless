@@ -39,8 +39,8 @@ export function escapeHtml(str: string): string {
 }
 
 /**
- * Format a .localhost URL. Omits the port when it matches the protocol default
- * (80 for HTTP, 443 for HTTPS).
+ * Format a URL for the given hostname. Omits the port when it matches the
+ * protocol default (80 for HTTP, 443 for HTTPS).
  */
 export function formatUrl(hostname: string, proxyPort: number, tls = false): string {
   const proto = tls ? "https" : "http";
@@ -64,6 +64,11 @@ export function parseHostname(input: string, tld = "localhost"): string {
     .replace(/^https?:\/\//, "")
     .split("/")[0]
     .toLowerCase();
+
+  // Backward compat: strip default .localhost suffix when switching to a custom TLD
+  if (tld !== "localhost" && hostname.endsWith(".localhost")) {
+    hostname = hostname.slice(0, -".localhost".length);
+  }
 
   // Validate non-empty
   if (!hostname || hostname === suffix) {

@@ -334,6 +334,15 @@ async function runApp(
 ) {
   const hostname = parseHostname(name, tld);
 
+  const envTld = getDefaultTld();
+  if (envTld !== DEFAULT_TLD && envTld !== tld) {
+    console.warn(
+      chalk.yellow(
+        `Warning: PORTLESS_TLD=${envTld} but the running proxy uses .${tld}. Using .${tld}.`
+      )
+    );
+  }
+
   console.log(chalk.blue.bold(`\nportless\n`));
   console.log(chalk.gray(`-- ${hostname} (auto-resolves to 127.0.0.1)`));
   if (autoInfo) {
@@ -900,7 +909,7 @@ ${chalk.bold("Examples:")}
 
   const force = args.includes("--force");
   store.addRoute(hostname, port, 0, force);
-  console.log(chalk.green(`Alias registered: ${hostname} -> localhost:${port}`));
+  console.log(chalk.green(`Alias registered: ${hostname} -> 127.0.0.1:${port}`));
 }
 
 async function handleHosts(args: string[]): Promise<void> {

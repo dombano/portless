@@ -166,8 +166,12 @@ describe("parseHostname", () => {
       expect(parseHostname("myapp.test", "test")).toBe("myapp.test");
     });
 
-    it("does not append if wrong TLD suffix", () => {
-      expect(parseHostname("myapp.localhost", "test")).toBe("myapp.localhost.test");
+    it("strips .localhost suffix when using a different TLD", () => {
+      expect(parseHostname("myapp.localhost", "test")).toBe("myapp.test");
+    });
+
+    it("strips .localhost subdomain suffix when using a different TLD", () => {
+      expect(parseHostname("api.myapp.localhost", "test")).toBe("api.myapp.test");
     });
 
     it("handles subdomain with custom TLD", () => {
