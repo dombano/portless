@@ -3,8 +3,8 @@
 Replace port numbers with stable, named .localhost URLs. For humans and agents.
 
 ```diff
-- "dev": "next dev"                # http://localhost:3000
-+ "dev": "portless run next dev"   # http://myapp.localhost:1355
+- "dev": "next dev"                  # http://localhost:3000
++ "dev": "portless run next dev"     # https://myapp.localhost
 ```
 
 ## Quick Start
