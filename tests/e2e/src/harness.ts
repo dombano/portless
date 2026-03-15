@@ -14,25 +14,54 @@ const VENV_DIR = path.resolve(__dirname, "../.venv");
 // collisions. Current allocation: 19001-19011. Pick the next unused port
 // when adding a new test.
 
+const isWindows = process.platform === "win32";
+
 /** Path to the Python binary inside the e2e venv. */
-export const PYTHON_BIN = path.join(VENV_DIR, "bin", "python3");
+export const PYTHON_BIN = isWindows
+  ? path.join(VENV_DIR, "Scripts", "python.exe")
+  : path.join(VENV_DIR, "bin", "python3");
 
 /** Kill any process listening on the given TCP port (skips our own PID). */
 function killPort(port: number): void {
   try {
-    const pids = execSync(`lsof -ti tcp:${port}`, {
-      encoding: "utf-8",
-      timeout: 5000,
-    }).trim();
-    if (pids) {
+    if (isWindows) {
+      const output = execSync("netstat -ano -p tcp", {
+        encoding: "utf-8",
+        timeout: 5000,
+      });
       const myPid = process.pid;
-      for (const raw of pids.split("\n")) {
-        const pid = parseInt(raw, 10);
-        if (isNaN(pid) || pid === myPid) continue;
+      for (const line of output.split(/\r?\n/)) {
+        if (!line.includes("LISTENING")) continue;
+        const parts = line.trim().split(/\s+/);
+        if (parts.length < 5) continue;
+        const localAddr = parts[1];
+        const lastColon = localAddr.lastIndexOf(":");
+        if (lastColon === -1) continue;
+        const addrPort = parseInt(localAddr.substring(lastColon + 1), 10);
+        if (addrPort !== port) continue;
+        const pid = parseInt(parts[parts.length - 1], 10);
+        if (isNaN(pid) || pid <= 0 || pid === myPid) continue;
         try {
           process.kill(pid, "SIGTERM");
         } catch {
           // already dead
+        }
+      }
+    } else {
+      const pids = execSync(`lsof -ti tcp:${port}`, {
+        encoding: "utf-8",
+        timeout: 5000,
+      }).trim();
+      if (pids) {
+        const myPid = process.pid;
+        for (const raw of pids.split("\n")) {
+          const pid = parseInt(raw, 10);
+          if (isNaN(pid) || pid === myPid) continue;
+          try {
+            process.kill(pid, "SIGTERM");
+          } catch {
+            // already dead
+          }
         }
       }
     }

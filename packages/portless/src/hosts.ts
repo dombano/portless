@@ -1,7 +1,12 @@
 import * as fs from "node:fs";
 import * as dns from "node:dns";
+import * as path from "node:path";
 
-const HOSTS_PATH = "/etc/hosts";
+const isWindows = process.platform === "win32";
+
+const HOSTS_PATH = isWindows
+  ? path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "drivers", "etc", "hosts")
+  : "/etc/hosts";
 const MARKER_START = "# portless-start";
 const MARKER_END = "# portless-end";
 

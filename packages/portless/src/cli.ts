@@ -40,6 +40,12 @@ import {
 // Constants
 // ---------------------------------------------------------------------------
 
+/** Display-friendly hosts file path. */
+const HOSTS_DISPLAY = isWindows ? "hosts file" : "/etc/hosts";
+
+/** Prefix for commands that need elevated privileges. */
+const SUDO_PREFIX = isWindows ? "" : "sudo ";
+
 /** Debounce delay (ms) for reloading routes after a file change. */
 const DEBOUNCE_MS = 100;
 
@@ -719,8 +725,8 @@ ${chalk.bold("Usage:")}
   ${chalk.cyan("portless alias --remove <name>")}   Remove a static route
   ${chalk.cyan("portless list")}                    Show active routes
   ${chalk.cyan("portless trust")}                   Add local CA to system trust store
-  ${chalk.cyan("portless hosts sync")}              Add routes to /etc/hosts (fixes Safari)
-  ${chalk.cyan("portless hosts clean")}             Remove portless entries from /etc/hosts
+  ${chalk.cyan("portless hosts sync")}              Add routes to ${HOSTS_DISPLAY} (fixes Safari)
+  ${chalk.cyan("portless hosts clean")}             Remove portless entries from ${HOSTS_DISPLAY}
 
 ${chalk.bold("Examples:")}
   portless proxy start                # Start proxy on port 1355
@@ -775,7 +781,7 @@ ${chalk.bold("Environment variables:")}
   PORTLESS_APP_PORT=<number>    Use a fixed port for the app (same as --app-port)
   PORTLESS_HTTPS=1              Always enable HTTPS (set in .bashrc / .zshrc)
   PORTLESS_TLD=<tld>            Use a custom TLD (e.g. test, dev; default: localhost)
-  PORTLESS_SYNC_HOSTS=1         Auto-sync /etc/hosts (auto-enabled for custom TLDs)
+  PORTLESS_SYNC_HOSTS=1         Auto-sync ${HOSTS_DISPLAY} (auto-enabled for custom TLDs)
   PORTLESS_STATE_DIR=<path>     Override the state directory
   PORTLESS=0                    Run command directly without proxy
 
@@ -787,11 +793,11 @@ ${chalk.bold("Child process environment:")}
 ${chalk.bold("Safari / DNS:")}
   .localhost subdomains auto-resolve in Chrome, Firefox, and Edge.
   Safari relies on the system DNS resolver, which may not handle them.
-  Auto-syncs /etc/hosts for custom TLDs (e.g. --tld test). For .localhost,
+  Auto-syncs ${HOSTS_DISPLAY} for custom TLDs (e.g. --tld test). For .localhost,
   set PORTLESS_SYNC_HOSTS=1 to enable. To manually sync:
-    ${chalk.cyan("sudo portless hosts sync")}
+    ${chalk.cyan(`${SUDO_PREFIX}portless hosts sync`)}
   Clean up later with:
-    ${chalk.cyan("sudo portless hosts clean")}
+    ${chalk.cyan(`${SUDO_PREFIX}portless hosts clean`)}
 
 ${chalk.bold("Skip portless:")}
   PORTLESS=0 pnpm dev           # Runs command directly without proxy
@@ -963,14 +969,14 @@ ${chalk.bold("Examples:")}
 async function handleHosts(args: string[]): Promise<void> {
   if (args[1] === "--help" || args[1] === "-h") {
     console.log(`
-${chalk.bold("portless hosts")} - Manage /etc/hosts entries for .localhost subdomains.
+${chalk.bold("portless hosts")} - Manage ${HOSTS_DISPLAY} entries for .localhost subdomains.
 
 Safari relies on the system DNS resolver, which may not handle .localhost
-subdomains. This command adds entries to /etc/hosts as a workaround.
+subdomains. This command adds entries to ${HOSTS_DISPLAY} as a workaround.
 
 ${chalk.bold("Usage:")}
-  ${chalk.cyan("sudo portless hosts sync")}    Add current routes to /etc/hosts
-  ${chalk.cyan("sudo portless hosts clean")}   Remove portless entries from /etc/hosts
+  ${chalk.cyan(`${SUDO_PREFIX}portless hosts sync`)}    Add current routes to ${HOSTS_DISPLAY}
+  ${chalk.cyan(`${SUDO_PREFIX}portless hosts clean`)}   Remove portless entries from ${HOSTS_DISPLAY}
 
 ${chalk.bold("Auto-sync:")}
   Auto-enabled for custom TLDs (e.g. --tld test). For .localhost, set
@@ -981,10 +987,14 @@ ${chalk.bold("Auto-sync:")}
 
   if (args[1] === "clean") {
     if (cleanHostsFile()) {
-      console.log(chalk.green("Removed portless entries from /etc/hosts."));
+      console.log(chalk.green(`Removed portless entries from ${HOSTS_DISPLAY}.`));
     } else {
-      console.error(chalk.red("Failed to update /etc/hosts (requires sudo)."));
-      console.error(chalk.cyan("  sudo portless hosts clean"));
+      console.error(
+        chalk.red(
+          `Failed to update ${HOSTS_DISPLAY}${isWindows ? " (run as Administrator)." : " (requires sudo)."}`
+        )
+      );
+      console.error(chalk.cyan(`  ${SUDO_PREFIX}portless hosts clean`));
       process.exit(1);
     }
     return;
@@ -994,8 +1004,8 @@ ${chalk.bold("Auto-sync:")}
     console.log(`
 ${chalk.bold("Usage: portless hosts <command>")}
 
-  ${chalk.cyan("sudo portless hosts sync")}    Add current routes to /etc/hosts
-  ${chalk.cyan("sudo portless hosts clean")}   Remove portless entries from /etc/hosts
+  ${chalk.cyan(`${SUDO_PREFIX}portless hosts sync`)}    Add current routes to ${HOSTS_DISPLAY}
+  ${chalk.cyan(`${SUDO_PREFIX}portless hosts clean`)}   Remove portless entries from ${HOSTS_DISPLAY}
 `);
     process.exit(0);
   }
@@ -1003,8 +1013,10 @@ ${chalk.bold("Usage: portless hosts <command>")}
   if (args[1] !== "sync") {
     console.error(chalk.red(`Error: Unknown hosts subcommand "${args[1]}".`));
     console.error(chalk.blue("Usage:"));
-    console.error(chalk.cyan("  portless hosts sync    # Add routes to /etc/hosts"));
-    console.error(chalk.cyan("  portless hosts clean   # Remove portless entries"));
+    console.error(
+      chalk.cyan(`  ${SUDO_PREFIX}portless hosts sync    # Add routes to ${HOSTS_DISPLAY}`)
+    );
+    console.error(chalk.cyan(`  ${SUDO_PREFIX}portless hosts clean   # Remove portless entries`));
     process.exit(1);
   }
 
@@ -1020,13 +1032,17 @@ ${chalk.bold("Usage: portless hosts <command>")}
   }
   const hostnames = routes.map((r) => r.hostname);
   if (syncHostsFile(hostnames)) {
-    console.log(chalk.green(`Synced ${hostnames.length} hostname(s) to /etc/hosts:`));
+    console.log(chalk.green(`Synced ${hostnames.length} hostname(s) to ${HOSTS_DISPLAY}:`));
     for (const h of hostnames) {
       console.log(chalk.cyan(`  127.0.0.1 ${h}`));
     }
   } else {
-    console.error(chalk.red("Failed to update /etc/hosts (requires sudo)."));
-    console.error(chalk.cyan("  sudo portless hosts sync"));
+    console.error(
+      chalk.red(
+        `Failed to update ${HOSTS_DISPLAY}${isWindows ? " (run as Administrator)." : " (requires sudo)."}`
+      )
+    );
+    console.error(chalk.cyan(`  ${SUDO_PREFIX}portless hosts sync`));
     process.exit(1);
   }
 }
@@ -1139,10 +1155,12 @@ ${chalk.bold("Usage:")}
     process.env.PORTLESS_SYNC_HOSTS === "0" || process.env.PORTLESS_SYNC_HOSTS === "false";
   if (tld !== DEFAULT_TLD && syncDisabled) {
     console.warn(
-      chalk.yellow(`Warning: .${tld} domains require /etc/hosts entries to resolve to 127.0.0.1.`)
+      chalk.yellow(
+        `Warning: .${tld} domains require ${HOSTS_DISPLAY} entries to resolve to 127.0.0.1.`
+      )
     );
     console.warn(chalk.yellow("Hosts sync is disabled. To add entries manually, run:"));
-    console.warn(chalk.cyan("  sudo portless hosts sync"));
+    console.warn(chalk.cyan(`  ${SUDO_PREFIX}portless hosts sync`));
   }
 
   // Custom cert/key implies HTTPS
