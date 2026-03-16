@@ -109,8 +109,9 @@ Most frameworks (Next.js, Express, Nuxt, etc.) respect the `PORT` env var automa
 
 Portless stores its state (routes, PID file, port file) in a directory that depends on the proxy port:
 
-- **Port < 1024** (sudo required): `/tmp/portless`
+- **Port < 1024** (sudo required): `/tmp/portless` (macOS/Linux only)
 - **Port >= 1024** (no sudo): `~/.portless`
+- **Windows**: Always `~/.portless` (no privileged port concept)
 
 Override with the `PORTLESS_STATE_DIR` environment variable.
 
@@ -138,7 +139,7 @@ sudo portless trust                           # Add CA to trust store later
 
 First run generates a local CA and prompts for sudo to add it to the system trust store. After that, no prompts and no browser warnings. Set `PORTLESS_HTTPS=1` in `.bashrc`/`.zshrc` to make it permanent.
 
-On Linux, `portless trust` supports Debian/Ubuntu, Arch, Fedora/RHEL/CentOS, and openSUSE (via `update-ca-certificates` or `update-ca-trust`).
+On Linux, `portless trust` supports Debian/Ubuntu, Arch, Fedora/RHEL/CentOS, and openSUSE (via `update-ca-certificates` or `update-ca-trust`). On Windows, it uses `certutil` to add the CA to the system trust store.
 
 ## CLI Reference
 
@@ -147,6 +148,8 @@ On Linux, `portless trust` supports Debian/Ubuntu, Arch, Fedora/RHEL/CentOS, and
 | `portless run <cmd> [args...]`         | Infer name from project, run through proxy (auto-starts)      |
 | `portless run --name <name> <cmd>`     | Override inferred base name (worktree prefix still applies)   |
 | `portless <name> <cmd> [args...]`      | Run app at `http://<name>.localhost:1355` (auto-starts proxy) |
+| `portless get <name>`                  | Print URL for a service (for cross-service wiring)            |
+| `portless get <name> --no-worktree`    | Print URL without worktree prefix                             |
 | `portless list`                        | Show active routes                                            |
 | `portless trust`                       | Add local CA to system trust store (for HTTPS)                |
 | `portless proxy start`                 | Start the proxy as a daemon (port 1355, no sudo)              |
@@ -168,7 +171,7 @@ On Linux, `portless trust` supports Debian/Ubuntu, Arch, Fedora/RHEL/CentOS, and
 | `portless run --help`                  | Show help for a subcommand (also: alias, hosts)               |
 | `portless --version` / `-v`            | Show version                                                  |
 
-**Reserved names:** `run`, `alias`, `hosts`, `list`, `trust`, and `proxy` are subcommands and cannot be used as app names directly. Use `portless run <cmd>` to infer the name, or `portless --name <name> <cmd>` to force any name including reserved ones.
+**Reserved names:** `run`, `get`, `alias`, `hosts`, `list`, `trust`, and `proxy` are subcommands and cannot be used as app names directly. Use `portless run <cmd>` to infer the name, or `portless --name <name> <cmd>` to force any name including reserved ones.
 
 ## Troubleshooting
 
@@ -250,5 +253,5 @@ proxy: {
 ### Requirements
 
 - Node.js 20+
-- macOS or Linux
+- macOS, Linux, or Windows
 - `openssl` (for `--https` cert generation; ships with macOS and most Linux distributions)

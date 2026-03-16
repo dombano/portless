@@ -64,11 +64,15 @@ Portless stores state (routes, PID file, port file, TLS marker) in a directory t
   </thead>
   <tbody>
     <tr>
-      <td>Port below 1024 (sudo)</td>
+      <td>Port below 1024 (sudo, macOS/Linux)</td>
       <td>`/tmp/portless`</td>
     </tr>
     <tr>
       <td>Port 1024+ (no sudo)</td>
+      <td>`~/.portless`</td>
+    </tr>
+    <tr>
+      <td>Windows (any port)</td>
       <td>`~/.portless`</td>
     </tr>
   </tbody>
