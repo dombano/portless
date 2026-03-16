@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0
+
+### Features
+
+- **Windows support**: Full cross-platform support for Windows. Uses `os.tmpdir()` for state directory, `netstat -ano` for port detection, `shell: true` for command spawning, `certutil` for CA trust, and `windowsHide` for daemon spawn. Includes Windows CI job in GitHub Actions. (#6)
+
+### Bug Fixes
+
+- **`--name` sanitization in `portless run`**: Stop replacing dots with hyphens in `--name` values. Dots are valid and intentional in hostnames like `local.metaview`. The direct form and `portless get` already preserved dots; now `run --name` is consistent. (#108)
+- **worktree prefix only for linked worktrees**: Only prepend the branch name for linked worktrees, not the root worktree. Previously any non-main branch got a prefix when multiple worktrees existed, even in the primary clone. (#108)
+- **Windows hosts file paths**: Use platform-aware hosts file path (`C:\Windows\System32\drivers\etc\hosts` on Windows, `/etc/hosts` on Unix) and platform-appropriate error messages (Administrator vs sudo). (#113)
+
 ## 0.6.0
 
 ### Features
