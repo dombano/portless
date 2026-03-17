@@ -1,5 +1,5 @@
 ---
-"portless-monorepo": patch
+"portless": patch
 ---
 
 ### Bug Fixes
