@@ -3,6 +3,7 @@ import Link from "next/link";
 import { GeistPixelSquare } from "geist/font/pixel";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Search } from "@/components/search";
 import { DocsChat } from "@/components/docs-chat";
 import { DocsMobileNav } from "@/components/docs-mobile-nav";
 import { DocsNav } from "@/components/docs-nav";
@@ -58,6 +59,7 @@ function Header() {
           </Link>
         </div>
         <nav className="flex items-center gap-4">
+          <Search />
           <a
             href="https://github.com/vercel-labs/portless"
             target="_blank"
