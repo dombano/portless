@@ -469,6 +469,13 @@ function sanitizeHostForFilename(hostname: string): string {
 }
 
 /**
+ * Maximum length of the X.509 Common Name (CN) field, per RFC 5280 §4.1.2.6.
+ * Modern TLS uses Subject Alternative Names (SAN) for hostname matching, so
+ * truncating the CN is safe -- SANs always take precedence.
+ */
+const MAX_CN_LENGTH = 64;
+
+/**
  * Generate a certificate for a specific hostname, signed by the local CA.
  * Certs are cached on disk in the host-certs subdirectory.
  *
@@ -497,8 +504,11 @@ async function generateHostCertAsync(
   // Generate key
   await opensslAsync(["ecparam", "-genkey", "-name", "prime256v1", "-noout", "-out", keyPath]);
 
+  // The X.509 CN field has a 64-character limit (RFC 5280 §4.1.2.6).
+  // Truncate when necessary -- TLS validation uses SANs, not CN, so this is safe.
+  const cn = hostname.length > MAX_CN_LENGTH ? hostname.slice(0, MAX_CN_LENGTH) : hostname;
   // Generate CSR
-  await opensslAsync(["req", "-new", "-key", keyPath, "-out", csrPath, "-subj", `/CN=${hostname}`]);
+  await opensslAsync(["req", "-new", "-key", keyPath, "-out", csrPath, "-subj", `/CN=${cn}`]);
 
   // Build SAN list: include the exact hostname plus a wildcard at the same level
   // e.g., for "chat.json-render2.localhost" -> also add "*.json-render2.localhost"

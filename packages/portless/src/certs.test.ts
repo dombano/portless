@@ -250,6 +250,33 @@ describe("createSNICallback", () => {
     expect(cert.subjectAltName).toContain("DNS:chat.myapp.localhost");
   });
 
+  it("generates cert for a hostname longer than 64 characters (X.509 CN limit)", async () => {
+    // Construct a hostname that exceeds the 64-char CN limit:
+    // "inngest.ap.very-long-branch-name-that-exceeds-the-cn-limit.dev" = 63+ chars
+    const longPrefix = "a".repeat(55);
+    const longHostname = `service.${longPrefix}.localhost`;
+    expect(longHostname.length).toBeGreaterThan(64);
+
+    const sniCallback = createSNICallback(tmpDir, defaultCert, defaultKey);
+    const ctx = await new Promise<tls.SecureContext | undefined>((resolve, reject) => {
+      sniCallback(longHostname, (err, ctx) => {
+        if (err) reject(err);
+        else resolve(ctx);
+      });
+    });
+
+    expect(ctx).toBeDefined();
+
+    // Verify the generated cert uses the full hostname in the SAN (not CN).
+    // TLS validation relies on SAN, not CN, so the full hostname must be there.
+    const safeName = longHostname.replace(/\./g, "_");
+    const hostCertPath = path.join(tmpDir, "host-certs", `${safeName}.pem`);
+    expect(fs.existsSync(hostCertPath)).toBe(true);
+
+    const cert = new crypto.X509Certificate(fs.readFileSync(hostCertPath));
+    expect(cert.subjectAltName).toContain(`DNS:${longHostname}`);
+  });
+
   it("caches generated certs in memory on subsequent calls", async () => {
     const sniCallback = createSNICallback(tmpDir, defaultCert, defaultKey);
 

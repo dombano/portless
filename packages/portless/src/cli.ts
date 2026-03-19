@@ -431,10 +431,14 @@ async function runApp(
         timeout: SUDO_SPAWN_TIMEOUT_MS,
       });
       if (result.status !== 0) {
-        console.error(chalk.red("Failed to start proxy."));
-        console.error(chalk.blue("Try starting it manually:"));
-        console.error(chalk.cyan("  sudo portless proxy start"));
-        process.exit(1);
+        // A concurrent portless run may have already started the proxy.
+        // Check before failing -- if it is running, we can continue.
+        if (!(await isProxyRunning(proxyPort))) {
+          console.error(chalk.red("Failed to start proxy."));
+          console.error(chalk.blue("Try starting it manually:"));
+          console.error(chalk.cyan("  sudo portless proxy start"));
+          process.exit(1);
+        }
       }
     } else {
       // Non-privileged port -- auto-start silently, no prompt needed
@@ -447,10 +451,14 @@ async function runApp(
         timeout: SUDO_SPAWN_TIMEOUT_MS,
       });
       if (result.status !== 0) {
-        console.error(chalk.red("Failed to start proxy."));
-        console.error(chalk.blue("Try starting it manually:"));
-        console.error(chalk.cyan("  portless proxy start"));
-        process.exit(1);
+        // A concurrent portless run may have already started the proxy.
+        // Check before failing -- if it is running, we can continue.
+        if (!(await isProxyRunning(proxyPort))) {
+          console.error(chalk.red("Failed to start proxy."));
+          console.error(chalk.blue("Try starting it manually:"));
+          console.error(chalk.cyan("  portless proxy start"));
+          process.exit(1);
+        }
       }
     }
 
