@@ -29,7 +29,7 @@ export function Search() {
       setResults([]);
       router.push(href);
     },
-    [router],
+    [router]
   );
 
   useEffect(() => {
@@ -210,18 +210,13 @@ export function Search() {
             )}
           </div>
 
-          <div
-            ref={listRef}
-            className="max-h-[min(60vh,400px)] overflow-y-auto p-2"
-          >
+          <div ref={listRef} className="max-h-[min(60vh,400px)] overflow-y-auto p-2">
             {loading && hasQuery ? (
               <div className="flex items-center justify-center py-6">
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
               </div>
             ) : hasQuery && results.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                No results found.
-              </p>
+              <p className="py-6 text-center text-sm text-muted-foreground">No results found.</p>
             ) : !hasQuery ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
                 Type to search documentation...
@@ -235,9 +230,7 @@ export function Search() {
                   onMouseEnter={() => setActiveIndex(i)}
                   className={cn(
                     "flex w-full flex-col gap-1 rounded-md px-3 py-2 text-left transition-colors",
-                    i === activeIndex
-                      ? "bg-muted text-foreground"
-                      : "text-foreground",
+                    i === activeIndex ? "bg-muted text-foreground" : "text-foreground"
                   )}
                 >
                   <span className="text-sm font-medium">{item.title}</span>
