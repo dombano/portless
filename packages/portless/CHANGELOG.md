@@ -5,6 +5,8 @@
 ### Patch Changes
 
 - f00bf45: ### Bug Fixes
+  - Fixed **`--port` injection** for commands run via package runners like `npx`, `pnpm dlx`, etc. (#150)
+  - Fixed **TLS cert generation** for long hostnames and proxy startup races (#149)
   - Fixed **'node not recognized'** error on Windows when running `portless run` (#126)
   - Fixed **proxy crash** caused by unhandled `ECONNRESET` errors on TLS wrapper sockets (#127)
 
