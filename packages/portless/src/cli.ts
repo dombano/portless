@@ -1387,6 +1387,12 @@ async function handleNamedMode(args: string[]): Promise<void> {
     process.exit(1);
   }
 
+  // Truncate individual labels that exceed the DNS limit, same as handleRunMode.
+  const safeName = parsed.name
+    .split(".")
+    .map((label) => truncateLabel(label))
+    .join(".");
+
   const { dir, port, tls, tld } = await discoverState();
   const store = new RouteStore(dir, {
     onWarning: (msg) => console.warn(chalk.yellow(msg)),
@@ -1395,7 +1401,7 @@ async function handleNamedMode(args: string[]): Promise<void> {
     store,
     port,
     dir,
-    parsed.name,
+    safeName,
     parsed.commandArgs,
     tls,
     tld,
