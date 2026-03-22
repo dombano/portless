@@ -72,13 +72,18 @@ const MAX_PROXY_HOPS = 5;
  * Find the route matching a given host. Matches exact hostname first, then
  * falls back to wildcard subdomain matching (e.g. tenant.myapp.localhost
  * matches a route registered for myapp.localhost).
+ *
+ * When `strict` is true, only exact matches are returned -- unregistered
+ * subdomain prefixes will not fall back to the base service.
  */
 function findRoute(
   routes: { hostname: string; port: number }[],
-  host: string
+  host: string,
+  strict?: boolean
 ): { hostname: string; port: number } | undefined {
   return (
-    routes.find((r) => r.hostname === host) || routes.find((r) => host.endsWith("." + r.hostname))
+    routes.find((r) => r.hostname === host) ||
+    (strict ? undefined : routes.find((r) => host.endsWith("." + r.hostname)))
   );
 }
 
@@ -101,6 +106,7 @@ export function createProxyServer(options: ProxyServerOptions): ProxyServer {
     getRoutes,
     proxyPort,
     tld = "localhost",
+    strict = true,
     onError = (msg: string) => console.error(msg),
     tls,
   } = options;
@@ -143,7 +149,7 @@ export function createProxyServer(options: ProxyServerOptions): ProxyServer {
       return;
     }
 
-    const route = findRoute(routes, host);
+    const route = findRoute(routes, host, strict);
 
     if (!route) {
       const safeHost = escapeHtml(host);
@@ -260,7 +266,7 @@ export function createProxyServer(options: ProxyServerOptions): ProxyServer {
 
     const routes = getRoutes();
     const host = getRequestHost(req).split(":")[0];
-    const route = findRoute(routes, host);
+    const route = findRoute(routes, host, strict);
 
     if (!route) {
       socket.destroy();

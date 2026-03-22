@@ -153,7 +153,7 @@ describe("createProxyServer", () => {
       expect(res.body).toBe("hello from backend");
     });
 
-    it("routes wildcard subdomain to matching parent route", async () => {
+    it("routes wildcard subdomain to matching parent route when strict is false", async () => {
       const backend = trackServer(
         http.createServer((_req, res) => {
           res.writeHead(200, { "Content-Type": "text/plain" });
@@ -166,7 +166,11 @@ describe("createProxyServer", () => {
 
       const routes: RouteInfo[] = [{ hostname: "myapp.localhost", port: backendAddr.port }];
       const server = trackServer(
-        createProxyServer({ getRoutes: () => routes, proxyPort: TEST_PROXY_PORT })
+        createProxyServer({
+          getRoutes: () => routes,
+          proxyPort: TEST_PROXY_PORT,
+          strict: false,
+        })
       );
       await listen(server);
 
@@ -201,7 +205,11 @@ describe("createProxyServer", () => {
         { hostname: "myapp.localhost", port: wildcardAddr.port },
       ];
       const server = trackServer(
-        createProxyServer({ getRoutes: () => routes, proxyPort: TEST_PROXY_PORT })
+        createProxyServer({
+          getRoutes: () => routes,
+          proxyPort: TEST_PROXY_PORT,
+          strict: false,
+        })
       );
       await listen(server);
 
@@ -241,6 +249,95 @@ describe("createProxyServer", () => {
       const res = await request(server, { host: "myapp.localhost:80" });
       expect(res.status).toBe(200);
       expect(res.body).toBe("matched");
+    });
+
+    it("returns 404 for unregistered subdomain prefix by default", async () => {
+      const backend = trackServer(
+        http.createServer((_req, res) => {
+          res.writeHead(200, { "Content-Type": "text/plain" });
+          res.end("should not reach");
+        })
+      );
+      await listen(backend);
+      const backendAddr = backend.address();
+      if (!backendAddr || typeof backendAddr === "string") throw new Error("no addr");
+
+      const routes: RouteInfo[] = [{ hostname: "myapp.localhost", port: backendAddr.port }];
+      const server = trackServer(
+        createProxyServer({ getRoutes: () => routes, proxyPort: TEST_PROXY_PORT })
+      );
+      await listen(server);
+
+      const res = await request(server, { host: "unknown.myapp.localhost" });
+      expect(res.status).toBe(404);
+      expect(res.body).toContain("Not Found");
+    });
+
+    it("still routes exact matches by default", async () => {
+      const backend = trackServer(
+        http.createServer((_req, res) => {
+          res.writeHead(200, { "Content-Type": "text/plain" });
+          res.end("exact match");
+        })
+      );
+      await listen(backend);
+      const backendAddr = backend.address();
+      if (!backendAddr || typeof backendAddr === "string") throw new Error("no addr");
+
+      const routes: RouteInfo[] = [{ hostname: "myapp.localhost", port: backendAddr.port }];
+      const server = trackServer(
+        createProxyServer({ getRoutes: () => routes, proxyPort: TEST_PROXY_PORT })
+      );
+      await listen(server);
+
+      const res = await request(server, { host: "myapp.localhost" });
+      expect(res.status).toBe(200);
+      expect(res.body).toBe("exact match");
+    });
+
+    it("routes registered subdomain prefix but not unregistered ones", async () => {
+      const parentBackend = trackServer(
+        http.createServer((_req, res) => {
+          res.writeHead(200, { "Content-Type": "text/plain" });
+          res.end("parent");
+        })
+      );
+      await listen(parentBackend);
+      const parentAddr = parentBackend.address();
+      if (!parentAddr || typeof parentAddr === "string") throw new Error("no addr");
+
+      const childBackend = trackServer(
+        http.createServer((_req, res) => {
+          res.writeHead(200, { "Content-Type": "text/plain" });
+          res.end("child");
+        })
+      );
+      await listen(childBackend);
+      const childAddr = childBackend.address();
+      if (!childAddr || typeof childAddr === "string") throw new Error("no addr");
+
+      const routes: RouteInfo[] = [
+        { hostname: "myapp.localhost", port: parentAddr.port },
+        { hostname: "feat.myapp.localhost", port: childAddr.port },
+      ];
+      const server = trackServer(
+        createProxyServer({ getRoutes: () => routes, proxyPort: TEST_PROXY_PORT })
+      );
+      await listen(server);
+
+      // Registered prefix routes to its own backend
+      const childRes = await request(server, { host: "feat.myapp.localhost" });
+      expect(childRes.status).toBe(200);
+      expect(childRes.body).toBe("child");
+
+      // Unregistered prefix returns 404
+      const unknownRes = await request(server, { host: "other.myapp.localhost" });
+      expect(unknownRes.status).toBe(404);
+
+      // Parent still works
+      const parentRes = await request(server, { host: "myapp.localhost" });
+      expect(parentRes.status).toBe(200);
+      expect(parentRes.body).toBe("parent");
     });
   });
 

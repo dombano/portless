@@ -212,6 +212,15 @@ export function isHttpsEnvEnabled(): boolean {
 }
 
 /**
+ * Return whether wildcard subdomain fallback is requested via the
+ * PORTLESS_WILDCARD env var.
+ */
+export function isWildcardEnvEnabled(): boolean {
+  const val = process.env.PORTLESS_WILDCARD;
+  return val === "1" || val === "true";
+}
+
+/**
  * Discover the active proxy's state directory, port, TLS mode, and TLD.
  * Checks the user-level dir first, then the system-level dir.
  * Falls back to the system dir with the default port if nothing is running.

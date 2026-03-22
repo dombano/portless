@@ -23,6 +23,7 @@ import {
   getDefaultTld,
   injectFrameworkFlags,
   isHttpsEnvEnabled,
+  isWildcardEnvEnabled,
   isProxyRunning,
   isWindows,
   prompt,
@@ -66,7 +67,8 @@ function startProxyServer(
   store: RouteStore,
   proxyPort: number,
   tld: string,
-  tlsOptions?: { cert: Buffer; key: Buffer }
+  tlsOptions?: { cert: Buffer; key: Buffer },
+  strict?: boolean
 ): void {
   store.ensureDir();
 
@@ -126,6 +128,7 @@ function startProxyServer(
     getRoutes: () => cachedRoutes,
     proxyPort,
     tld,
+    strict,
     onError: (msg) => console.error(chalk.red(msg)),
     tls: tlsOptions,
   });
@@ -162,7 +165,10 @@ function startProxyServer(
     fixOwnership(store.dir, store.pidPath, store.portFilePath);
     const proto = isTls ? "HTTPS/2" : "HTTP";
     const tldLabel = tld !== DEFAULT_TLD ? ` (TLD: .${tld})` : "";
-    console.log(chalk.green(`${proto} proxy listening on port ${proxyPort}${tldLabel}`));
+    const modeLabel = strict === false ? " (wildcard)" : "";
+    console.log(
+      chalk.green(`${proto} proxy listening on port ${proxyPort}${tldLabel}${modeLabel}`)
+    );
   });
 
   // Cleanup on exit
@@ -779,6 +785,7 @@ ${chalk.bold("Options:")}
   --no-tls                      Disable HTTPS (overrides PORTLESS_HTTPS)
   --foreground                  Run proxy in foreground (for debugging)
   --tld <tld>                   Use a custom TLD instead of .localhost (e.g. test, dev)
+  --wildcard                    Allow unregistered subdomains to fall back to parent route
   --app-port <number>           Use a fixed port for the app (skip auto-assignment)
   --force                       Override an existing route registered by another process
   --name <name>                 Use <name> as the app name (bypasses subcommand dispatch)
@@ -789,6 +796,7 @@ ${chalk.bold("Environment variables:")}
   PORTLESS_APP_PORT=<number>    Use a fixed port for the app (same as --app-port)
   PORTLESS_HTTPS=1              Always enable HTTPS (set in .bashrc / .zshrc)
   PORTLESS_TLD=<tld>            Use a custom TLD (e.g. test, dev; default: localhost)
+  PORTLESS_WILDCARD=1           Allow unregistered subdomains to fall back to parent route
   PORTLESS_SYNC_HOSTS=1         Auto-sync ${HOSTS_DISPLAY} (auto-enabled for custom TLDs)
   PORTLESS_STATE_DIR=<path>     Override the state directory
   PORTLESS=0                    Run command directly without proxy
@@ -1076,6 +1084,7 @@ ${chalk.bold("Usage:")}
   ${chalk.cyan("portless proxy start --foreground")}   Start in foreground (for debugging)
   ${chalk.cyan("portless proxy start -p 80")}          Start on port 80 (requires sudo)
   ${chalk.cyan("portless proxy start --tld test")}     Use .test instead of .localhost
+  ${chalk.cyan("portless proxy start --wildcard")}     Allow unregistered subdomains to fall back to parent
   ${chalk.cyan("portless proxy stop")}                 Stop the proxy
 `);
     process.exit(isProxyHelp || !args[1] ? 0 : 1);
@@ -1170,6 +1179,9 @@ ${chalk.bold("Usage:")}
     console.warn(chalk.yellow("Hosts sync is disabled. To add entries manually, run:"));
     console.warn(chalk.cyan(`  ${SUDO_PREFIX}portless hosts sync`));
   }
+
+  // Parse --wildcard flag (disables the default strict subdomain matching)
+  const useWildcard = args.includes("--wildcard") || isWildcardEnvEnabled();
 
   // Custom cert/key implies HTTPS
   const useHttps = wantHttps || !!(customCertPath && customKeyPath);
@@ -1275,7 +1287,7 @@ ${chalk.bold("Usage:")}
   // Foreground mode: run the proxy directly in this process
   if (isForeground) {
     console.log(chalk.blue.bold("\nportless proxy\n"));
-    startProxyServer(store, proxyPort, tld, tlsOptions);
+    startProxyServer(store, proxyPort, tld, tlsOptions, useWildcard ? false : undefined);
     return;
   }
 
@@ -1304,6 +1316,9 @@ ${chalk.bold("Usage:")}
     }
     if (tld !== DEFAULT_TLD) {
       daemonArgs.push("--tld", tld);
+    }
+    if (useWildcard) {
+      daemonArgs.push("--wildcard");
     }
 
     const child = spawn(process.execPath, daemonArgs, {

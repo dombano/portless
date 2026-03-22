@@ -11,6 +11,12 @@ export interface ProxyServerOptions {
   proxyPort: number;
   /** TLD suffix used for hostnames (default: "localhost"). */
   tld?: string;
+  /**
+   * When true, only exact hostname matches are used. Unregistered subdomain
+   * prefixes return 404 instead of falling back to the base service.
+   * Defaults to true.
+   */
+  strict?: boolean;
   /** Optional error logger; defaults to console.error. */
   onError?: (message: string) => void;
   /** When provided, enables HTTP/2 over TLS (HTTPS). */

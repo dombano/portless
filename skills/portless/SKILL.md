@@ -117,15 +117,16 @@ Override with the `PORTLESS_STATE_DIR` environment variable.
 
 ### Environment variables
 
-| Variable              | Description                                                       |
-| --------------------- | ----------------------------------------------------------------- |
-| `PORTLESS_PORT`       | Override the default proxy port (default: 1355)                   |
-| `PORTLESS_APP_PORT`   | Use a fixed port for the app (skip auto-assignment)               |
-| `PORTLESS_HTTPS`      | Set to `1` to always enable HTTPS/HTTP/2                          |
-| `PORTLESS_TLD`        | Use a custom TLD instead of localhost (e.g. test)                 |
-| `PORTLESS_SYNC_HOSTS` | Set to `1` to auto-sync /etc/hosts (auto-enabled for custom TLDs) |
-| `PORTLESS_STATE_DIR`  | Override the state directory                                      |
-| `PORTLESS=0`          | Bypass the proxy, run the command directly                        |
+| Variable              | Description                                                        |
+| --------------------- | ------------------------------------------------------------------ |
+| `PORTLESS_PORT`       | Override the default proxy port (default: 1355)                    |
+| `PORTLESS_APP_PORT`   | Use a fixed port for the app (skip auto-assignment)                |
+| `PORTLESS_HTTPS`      | Set to `1` to always enable HTTPS/HTTP/2                           |
+| `PORTLESS_TLD`        | Use a custom TLD instead of localhost (e.g. test)                  |
+| `PORTLESS_WILDCARD`   | Set to `1` to allow unregistered subdomains to fall back to parent |
+| `PORTLESS_SYNC_HOSTS` | Set to `1` to auto-sync /etc/hosts (auto-enabled for custom TLDs)  |
+| `PORTLESS_STATE_DIR`  | Override the state directory                                       |
+| `PORTLESS=0`          | Bypass the proxy, run the command directly                         |
 
 ### HTTP/2 + HTTPS
 
@@ -157,6 +158,7 @@ On Linux, `portless trust` supports Debian/Ubuntu, Arch, Fedora/RHEL/CentOS, and
 | `portless proxy start -p <number>`     | Start the proxy on a custom port                              |
 | `portless proxy start --tld test`      | Use .test instead of .localhost (requires /etc/hosts sync)    |
 | `portless proxy start --foreground`    | Start the proxy in foreground (for debugging)                 |
+| `portless proxy start --wildcard`      | Allow unregistered subdomains to fall back to parent route    |
 | `portless proxy stop`                  | Stop the proxy                                                |
 | `portless alias <name> <port>`         | Register a static route (e.g. for Docker containers)          |
 | `portless alias <name> <port> --force` | Overwrite an existing route                                   |
