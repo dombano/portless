@@ -71,7 +71,7 @@ portless api.myapp pnpm start    # http://api.myapp.localhost:1355
 portless docs.myapp next dev     # http://docs.myapp.localhost:1355
 ```
 
-Wildcard subdomain routing: any subdomain of a registered route routes to that app automatically (e.g. `tenant1.myapp.localhost:1355` routes to the `myapp` app without extra registration). Exact matches take priority over wildcards.
+By default, only explicitly registered subdomains are routed (strict mode). Start the proxy with `--wildcard` to allow any subdomain of a registered route to fall back to that app (e.g. `tenant1.myapp.localhost:1355` routes to the `myapp` app without extra registration). Exact matches always take priority over wildcards.
 
 ### Git worktrees
 
