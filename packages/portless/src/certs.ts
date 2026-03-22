@@ -204,7 +204,10 @@ function generateServerCert(stateDir: string): { certPath: string; keyPath: stri
   // to write "/Users/ashish.srl" instead of the intended location.
   const srlPath = path.join(stateDir, "ca.srl");
   if (!fileExists(srlPath)) {
-    fs.writeFileSync(srlPath, crypto.randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase() + "\n");
+    fs.writeFileSync(
+      srlPath,
+      crypto.randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase() + "\n"
+    );
   }
   openssl([
     "x509",
@@ -544,7 +547,10 @@ async function generateHostCertAsync(
   // incorrect .srl path resolution when $HOME contains a dot (see #152).
   const srlPath = path.join(stateDir, "ca.srl");
   if (!fs.existsSync(srlPath)) {
-    await fs.promises.writeFile(srlPath, crypto.randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase() + "\n");
+    await fs.promises.writeFile(
+      srlPath,
+      crypto.randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase() + "\n"
+    );
   }
   await opensslAsync([
     "x509",
