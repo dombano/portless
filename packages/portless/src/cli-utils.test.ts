@@ -16,6 +16,7 @@ import {
   getDefaultPort,
   getDefaultTld,
   getProtocolPort,
+  isHttpsEnvDisabled,
   injectFrameworkFlags,
   isProxyRunning,
   parsePidFromNetstat,
@@ -281,6 +282,42 @@ describe("getDefaultPort", () => {
   it("returns FALLBACK_PROXY_PORT when PORTLESS_PORT is empty and tls is undefined", () => {
     process.env.PORTLESS_PORT = "";
     expect(getDefaultPort()).toBe(FALLBACK_PROXY_PORT);
+  });
+});
+
+describe("isHttpsEnvDisabled", () => {
+  let originalEnv: string | undefined;
+
+  beforeEach(() => {
+    originalEnv = process.env.PORTLESS_HTTPS;
+  });
+
+  afterEach(() => {
+    if (originalEnv === undefined) {
+      delete process.env.PORTLESS_HTTPS;
+    } else {
+      process.env.PORTLESS_HTTPS = originalEnv;
+    }
+  });
+
+  it("returns true when PORTLESS_HTTPS is '0'", () => {
+    process.env.PORTLESS_HTTPS = "0";
+    expect(isHttpsEnvDisabled()).toBe(true);
+  });
+
+  it("returns true when PORTLESS_HTTPS is 'false'", () => {
+    process.env.PORTLESS_HTTPS = "false";
+    expect(isHttpsEnvDisabled()).toBe(true);
+  });
+
+  it("returns false when PORTLESS_HTTPS is '1'", () => {
+    process.env.PORTLESS_HTTPS = "1";
+    expect(isHttpsEnvDisabled()).toBe(false);
+  });
+
+  it("returns false when PORTLESS_HTTPS is unset", () => {
+    delete process.env.PORTLESS_HTTPS;
+    expect(isHttpsEnvDisabled()).toBe(false);
   });
 });
 

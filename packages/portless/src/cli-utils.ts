@@ -228,6 +228,15 @@ export function isHttpsEnvEnabled(): boolean {
 }
 
 /**
+ * Return whether HTTPS is explicitly disabled via the PORTLESS_HTTPS env var.
+ * PORTLESS_HTTPS=0 is the env-var equivalent of --no-tls.
+ */
+export function isHttpsEnvDisabled(): boolean {
+  const val = process.env.PORTLESS_HTTPS;
+  return val === "0" || val === "false";
+}
+
+/**
  * Return whether wildcard subdomain fallback is requested via the
  * PORTLESS_WILDCARD env var.
  */
@@ -284,8 +293,8 @@ export async function discoverState(): Promise<{
   // so the daemon may still be alive after the port file is gone.
   // Standard ports first (443, 80) since those are the new defaults, then the
   // legacy fallback port, then any PORTLESS_PORT override.
-  const envPort = getDefaultPort();
-  const probePorts = new Set([443, 80, FALLBACK_PROXY_PORT, envPort]);
+  const configuredPort = getDefaultPort();
+  const probePorts = new Set([443, 80, FALLBACK_PROXY_PORT, configuredPort]);
   for (const port of probePorts) {
     if (await isProxyRunning(port)) {
       const dir = resolveStateDir(port);
@@ -295,7 +304,12 @@ export async function discoverState(): Promise<{
     }
   }
 
-  return { dir: resolveStateDir(envPort), port: envPort, tls: false, tld: getDefaultTld() };
+  return {
+    dir: resolveStateDir(configuredPort),
+    port: configuredPort,
+    tls: false,
+    tld: getDefaultTld(),
+  };
 }
 
 // ---------------------------------------------------------------------------

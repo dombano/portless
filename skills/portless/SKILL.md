@@ -118,7 +118,7 @@ Override with the `PORTLESS_STATE_DIR` environment variable.
 | --------------------- | --------------------------------------------------------------------- |
 | `PORTLESS_PORT`       | Override the default proxy port (default: 443 with HTTPS, 80 without) |
 | `PORTLESS_APP_PORT`   | Use a fixed port for the app (skip auto-assignment)                   |
-| `PORTLESS_HTTPS`      | Enable HTTPS (default, accepted for compatibility)                    |
+| `PORTLESS_HTTPS`      | Enable HTTPS (default; set to `0` to disable, same as `--no-tls`)     |
 | `PORTLESS_TLD`        | Use a custom TLD instead of localhost (e.g. test)                     |
 | `PORTLESS_WILDCARD`   | Set to `1` to allow unregistered subdomains to fall back to parent    |
 | `PORTLESS_SYNC_HOSTS` | Set to `1` to auto-sync /etc/hosts (auto-enabled for custom TLDs)     |
@@ -240,12 +240,14 @@ Fix: set `changeOrigin: true` in the proxy config (Vite, webpack-dev-server, etc
 // vite.config.ts
 proxy: {
   "/api": {
-    target: "http://api.myapp.localhost",
+    target: "https://api.myapp.localhost",
     changeOrigin: true,
     ws: true,
   },
 }
 ```
+
+If your tooling doesn't trust the portless CA, point Node.js at it: `NODE_EXTRA_CA_CERTS=~/.portless/ca.pem` (or `/tmp/portless/ca.pem` when the proxy runs on a privileged port). Alternatively, use `--no-tls` for plain HTTP.
 
 ### Requirements
 

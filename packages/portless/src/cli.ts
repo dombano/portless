@@ -23,6 +23,7 @@ import {
   getDefaultPort,
   getDefaultTld,
   injectFrameworkFlags,
+  isHttpsEnvDisabled,
   isWildcardEnvEnabled,
   isProxyRunning,
   isWindows,
@@ -770,7 +771,7 @@ ${chalk.bold("Options:")}
 ${chalk.bold("Environment variables:")}
   PORTLESS_PORT=<number>        Override the default proxy port (e.g. in .bashrc)
   PORTLESS_APP_PORT=<number>    Use a fixed port for the app (same as --app-port)
-  PORTLESS_HTTPS=1              Enable HTTPS (default, accepted for compatibility)
+  PORTLESS_HTTPS=1              Enable HTTPS (default; set to 0 to disable, same as --no-tls)
   PORTLESS_TLD=<tld>            Use a custom TLD (e.g. test, dev; default: localhost)
   PORTLESS_WILDCARD=1           Allow unregistered subdomains to fall back to parent route
   PORTLESS_SYNC_HOSTS=1         Auto-sync ${HOSTS_DISPLAY} (auto-enabled for custom TLDs)
@@ -850,9 +851,9 @@ ${chalk.bold("Options:")}
   --help, -h             Show this help
 
 ${chalk.bold("Examples:")}
-  portless get backend                  # -> http://backend.localhost
-  portless get backend                  # in worktree -> http://auth.backend.localhost
-  portless get backend --no-worktree    # -> http://backend.localhost (skip worktree)
+  portless get backend                  # -> https://backend.localhost
+  portless get backend                  # in worktree -> https://auth.backend.localhost
+  portless get backend --no-worktree    # -> https://backend.localhost (skip worktree)
 `);
     process.exit(0);
   }
@@ -903,8 +904,8 @@ ${chalk.bold("Usage:")}
   ${chalk.cyan("portless alias <name> <port> --force")} Override existing route
 
 ${chalk.bold("Examples:")}
-  portless alias my-postgres 5432     # -> http://my-postgres.localhost
-  portless alias redis 6379           # -> http://redis.localhost
+  portless alias my-postgres 5432     # -> https://my-postgres.localhost
+  portless alias redis 6379           # -> https://redis.localhost
   portless alias --remove my-postgres # Remove the alias
 `);
     process.exit(0);
@@ -1068,8 +1069,8 @@ ${chalk.bold("Usage:")}
 
   const isForeground = args.includes("--foreground");
 
-  // HTTPS is on by default. Disable with --no-tls.
-  const hasNoTls = args.includes("--no-tls");
+  // HTTPS is on by default. Disable with --no-tls or PORTLESS_HTTPS=0.
+  const hasNoTls = args.includes("--no-tls") || isHttpsEnvDisabled();
   const wantHttps = !hasNoTls;
 
   // Parse optional --cert / --key for custom certificates
@@ -1165,8 +1166,8 @@ ${chalk.bold("Usage:")}
   const useWildcard = args.includes("--wildcard") || isWildcardEnvEnabled();
 
   // Resolve state directory based on the port
-  const stateDir = resolveStateDir(proxyPort);
-  const store = new RouteStore(stateDir, {
+  let stateDir = resolveStateDir(proxyPort);
+  let store = new RouteStore(stateDir, {
     onWarning: (msg) => console.warn(chalk.yellow(msg)),
   });
 
@@ -1240,24 +1241,19 @@ ${chalk.bold("Usage:")}
         return;
       }
 
-      // Continue below with the fallback port -- reassign store/stateDir
-      // by recursing with an explicit -p flag so the rest of handleProxy
-      // runs against the fallback port.
-      const fallbackArgs = ["proxy", "start", "-p", String(proxyPort)];
-      if (useHttps) fallbackArgs.push("--https");
-      if (tld !== DEFAULT_TLD) fallbackArgs.push("--tld", tld);
-      if (useWildcard) fallbackArgs.push("--wildcard");
-      if (isForeground) fallbackArgs.push("--foreground");
-      if (customCertPath && customKeyPath)
-        fallbackArgs.push("--cert", customCertPath, "--key", customKeyPath);
-      return handleProxy(fallbackArgs);
+      // Re-initialize state for the fallback port and fall through to the
+      // normal startup path below.
+      stateDir = resolveStateDir(proxyPort);
+      store = new RouteStore(stateDir, {
+        onWarning: (msg: string) => console.warn(chalk.yellow(msg)),
+      });
+    } else {
+      // Explicit port was requested but sudo failed -- error out.
+      console.error(chalk.red(`Error: Port ${proxyPort} requires sudo and elevation failed.`));
+      console.error(chalk.blue("Run with sudo:"));
+      console.error(chalk.cyan(`  sudo portless proxy start -p ${proxyPort}${extraFlags}`));
+      process.exit(1);
     }
-
-    // Explicit port was requested but sudo failed -- error out.
-    console.error(chalk.red(`Error: Port ${proxyPort} requires sudo and elevation failed.`));
-    console.error(chalk.blue("Run with sudo:"));
-    console.error(chalk.cyan(`  sudo portless proxy start -p ${proxyPort}${extraFlags}`));
-    process.exit(1);
   }
 
   // Prepare TLS options if HTTPS is requested

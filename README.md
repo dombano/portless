@@ -125,7 +125,7 @@ On Linux, `portless trust` supports Debian/Ubuntu, Arch, Fedora/RHEL/CentOS, and
 
 ```bash
 portless run [--name <name>] <cmd> [args...]  # Infer name (or override with --name), run through proxy
-portless <name> <cmd> [args...]  # Run app at http://<name>.localhost
+portless <name> <cmd> [args...]  # Run app at https://<name>.localhost
 portless alias <name> <port>     # Register a static route (e.g. for Docker)
 portless alias <name> <port> --force  # Overwrite an existing route
 portless alias --remove <name>   # Remove a static route
@@ -168,7 +168,7 @@ portless proxy stop              # Stop the proxy
 # Configuration
 PORTLESS_PORT=<number>           Override the default proxy port
 PORTLESS_APP_PORT=<number>       Use a fixed port for the app (same as --app-port)
-PORTLESS_HTTPS=1                 Enable HTTPS (default, accepted for compatibility)
+PORTLESS_HTTPS=1                 Enable HTTPS (default; set to 0 to disable, same as --no-tls)
 PORTLESS_TLD=<tld>               Use a custom TLD (e.g. test; default: localhost)
 PORTLESS_WILDCARD=1              Allow unregistered subdomains to fall back to parent route
 PORTLESS_SYNC_HOSTS=1            Auto-sync /etc/hosts (auto-enabled for custom TLDs)
@@ -205,7 +205,7 @@ If your frontend dev server (e.g. Vite, webpack) proxies API requests to another
 server: {
   proxy: {
     "/api": {
-      target: "http://api.myapp.localhost",
+      target: "https://api.myapp.localhost",
       changeOrigin: true,
       ws: true,
     },
@@ -219,11 +219,13 @@ server: {
 devServer: {
   proxy: [{
     context: ["/api"],
-    target: "http://api.myapp.localhost",
+    target: "https://api.myapp.localhost",
     changeOrigin: true,
   }],
 }
 ```
+
+If your tooling doesn't trust the portless CA, point Node.js at it: `NODE_EXTRA_CA_CERTS=~/.portless/ca.pem` (or `/tmp/portless/ca.pem` when the proxy runs on a privileged port). Alternatively, use `--no-tls` for plain HTTP.
 
 Portless detects this misconfiguration and responds with `508 Loop Detected` along with a message pointing to this fix.
 
