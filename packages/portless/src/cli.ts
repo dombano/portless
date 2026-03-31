@@ -7,7 +7,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { createSNICallback, ensureCerts, isCATrusted, trustCA } from "./certs.js";
-import { createProxyServer } from "./proxy.js";
+import { createHttpRedirectServer, createProxyServer } from "./proxy.js";
 import { fixOwnership, formatUrl, isErrnoException, parseHostname } from "./utils.js";
 import { syncHostsFile, cleanHostsFile } from "./hosts.js";
 import { FILE_MODE, RouteConflictError, RouteStore } from "./routes.js";
@@ -180,6 +180,18 @@ function startProxyServer(
     process.exit(1);
   });
 
+  // When TLS is enabled, start a plain HTTP server on port 80 that redirects
+  // to HTTPS. Best-effort: if port 80 is unavailable, skip silently (the main
+  // proxy on 443 still works; users just won't get automatic redirects).
+  let redirectServer: ReturnType<typeof createHttpRedirectServer> | null = null;
+  if (isTls && proxyPort !== 80) {
+    redirectServer = createHttpRedirectServer(proxyPort);
+    redirectServer.on("error", () => {
+      redirectServer = null;
+    });
+    redirectServer.listen(80);
+  }
+
   server.listen(proxyPort, () => {
     // Save PID and port once the server is actually listening
     fs.writeFileSync(store.pidPath, process.pid.toString(), { mode: FILE_MODE });
@@ -193,6 +205,9 @@ function startProxyServer(
     console.log(
       colors.green(`${proto} proxy listening on port ${proxyPort}${tldLabel}${modeLabel}`)
     );
+    if (redirectServer) {
+      console.log(colors.green("HTTP-to-HTTPS redirect listening on port 80"));
+    }
   });
 
   // Cleanup on exit
@@ -204,6 +219,9 @@ function startProxyServer(
     if (pollingInterval) clearInterval(pollingInterval);
     if (watcher) {
       watcher.close();
+    }
+    if (redirectServer) {
+      redirectServer.close();
     }
     try {
       fs.unlinkSync(store.pidPath);

@@ -423,3 +423,17 @@ export function createProxyServer(options: ProxyServerOptions): ProxyServer {
 
   return httpServer;
 }
+
+/**
+ * Create a minimal HTTP server that 302-redirects every request to HTTPS.
+ * Meant to run on port 80 alongside an HTTPS proxy on port 443.
+ */
+export function createHttpRedirectServer(httpsPort: number): http.Server {
+  return http.createServer((req, res) => {
+    const host = (req.headers.host || "localhost").split(":")[0];
+    const portSuffix = httpsPort === 443 ? "" : `:${httpsPort}`;
+    const location = `https://${host}${portSuffix}${req.url || "/"}`;
+    res.writeHead(302, { Location: location, [PORTLESS_HEADER]: "1" });
+    res.end();
+  });
+}
