@@ -1139,11 +1139,31 @@ ${colors.bold("Usage: portless hosts <command>")}
 
 async function handleProxy(args: string[]): Promise<void> {
   if (args[1] === "stop") {
-    const { dir, port, tls } = await discoverState();
-    const store = new RouteStore(dir, {
-      onWarning: (msg) => console.warn(colors.yellow(msg)),
-    });
-    await stopProxy(store, port, tls);
+    let explicitPort: number | undefined;
+    const portIdx = args.indexOf("--port") !== -1 ? args.indexOf("--port") : args.indexOf("-p");
+    if (portIdx !== -1) {
+      const portValue = args[portIdx + 1];
+      if (portValue && !portValue.startsWith("-")) {
+        const parsed = parseInt(portValue, 10);
+        if (!isNaN(parsed) && parsed >= 1 && parsed <= 65535) {
+          explicitPort = parsed;
+        }
+      }
+    }
+
+    if (explicitPort !== undefined) {
+      const dir = resolveStateDir(explicitPort);
+      const store = new RouteStore(dir, {
+        onWarning: (msg) => console.warn(colors.yellow(msg)),
+      });
+      await stopProxy(store, explicitPort, false);
+    } else {
+      const { dir, port, tls } = await discoverState();
+      const store = new RouteStore(dir, {
+        onWarning: (msg) => console.warn(colors.yellow(msg)),
+      });
+      await stopProxy(store, port, tls);
+    }
     return;
   }
 

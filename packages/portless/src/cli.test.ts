@@ -569,5 +569,17 @@ describe("CLI", () => {
       const start2 = run(["proxy", "start"], { env: proxyEnv() });
       expect(start2.stdout).toContain("already running");
     });
+
+    it("stops proxy using explicit -p flag instead of env var", () => {
+      const start = run(["proxy", "start"], { env: proxyEnv() });
+      expect(start.status).toBe(0);
+
+      // Stop without PORTLESS_PORT, using -p instead
+      const stop = run(["proxy", "stop", "-p", String(TEST_PORT)], {
+        env: { PORTLESS_HTTPS: "0", PORTLESS_STATE_DIR: tmpDir },
+      });
+      expect(stop.status).toBe(0);
+      expect(stop.stdout).toContain("Proxy stopped");
+    });
   });
 });
