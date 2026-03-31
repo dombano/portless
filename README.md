@@ -18,16 +18,11 @@ npm install -g portless
 ## Run your app
 
 ```bash
-# Enable HTTPS (one-time setup, auto-generates certs)
-portless proxy start --https
-
 portless myapp next dev
 # -> https://myapp.localhost
-
-# Without --https (port 80)
-portless myapp next dev
-# -> http://myapp.localhost
 ```
+
+HTTPS with HTTP/2 is enabled by default. On first run, portless generates a local CA, trusts it, and binds port 443 (auto-elevates with sudo on macOS/Linux). Use `--no-tls` for plain HTTP.
 
 The proxy auto-starts when you run an app. A random port (4000--4999) is assigned via the `PORT` environment variable. Most frameworks (Next.js, Express, Nuxt, etc.) respect this automatically. For frameworks that ignore `PORT` (Vite, Astro, React Router, Angular, Expo, React Native), portless auto-injects `--port` and `--host` flags.
 
@@ -47,10 +42,10 @@ Organize services with subdomains:
 
 ```bash
 portless api.myapp pnpm start
-# -> http://api.myapp.localhost
+# -> https://api.myapp.localhost
 
 portless docs.myapp next dev
-# -> http://docs.myapp.localhost
+# -> https://docs.myapp.localhost
 ```
 
 By default, only explicitly registered subdomains are routed (strict mode). Use `--wildcard` when starting the proxy to allow any subdomain of a registered route to fall back to that app (e.g. `tenant1.myapp.localhost` routes to the `myapp` app without extra registration).
@@ -61,16 +56,16 @@ By default, only explicitly registered subdomains are routed (strict mode). Use 
 
 ```bash
 # Main worktree -- no prefix
-portless run next dev   # -> http://myapp.localhost
+portless run next dev   # -> https://myapp.localhost
 
 # Linked worktree on branch "fix-ui"
-portless run next dev   # -> http://fix-ui.myapp.localhost
+portless run next dev   # -> https://fix-ui.myapp.localhost
 ```
 
 Use `--name` to override the inferred base name while keeping the worktree prefix:
 
 ```bash
-portless run --name myapp next dev   # -> http://fix-ui.myapp.localhost
+portless run --name myapp next dev   # -> https://fix-ui.myapp.localhost
 ```
 
 Put `portless run` in your `package.json` once and it works everywhere -- the main checkout uses the plain name, each worktree gets a unique subdomain. No collisions, no `--force`.
@@ -105,25 +100,20 @@ flowchart TD
 
 1. **Start the proxy** -- auto-starts when you run an app, or start explicitly with `portless proxy start`
 2. **Run apps** -- `portless <name> <command>` assigns a free port and registers with the proxy
-3. **Access via URL** -- `http://<name>.localhost` routes through the proxy to your app
+3. **Access via URL** -- `https://<name>.localhost` routes through the proxy to your app
 
 ## HTTP/2 + HTTPS
 
-Enable HTTP/2 for faster dev server page loads. Browsers limit HTTP/1.1 to 6 connections per host, which bottlenecks dev servers that serve many unbundled files (Vite, Nuxt, etc.). HTTP/2 multiplexes all requests over a single connection.
+HTTPS with HTTP/2 is enabled by default. Browsers limit HTTP/1.1 to 6 connections per host, which bottlenecks dev servers that serve many unbundled files (Vite, Nuxt, etc.). HTTP/2 multiplexes all requests over a single connection.
+
+On first run, portless generates a local CA and adds it to your system trust store. No browser warnings. No manual setup.
 
 ```bash
-# Start with HTTPS/2 -- generates certs and trusts them automatically
-portless proxy start --https
-
-# First run prompts for sudo once to add the CA to your system trust store.
-# After that, no prompts. No browser warnings.
-
-# Make it permanent (add to .bashrc / .zshrc)
-export PORTLESS_HTTPS=1
-portless proxy start    # HTTPS by default now
-
 # Use your own certs (e.g., from mkcert)
 portless proxy start --cert ./cert.pem --key ./key.pem
+
+# Disable HTTPS (plain HTTP on port 80)
+portless proxy start --no-tls
 
 # If you skipped sudo on first run, trust the CA later
 sudo portless trust
@@ -148,8 +138,8 @@ portless hosts clean             # Remove portless entries from /etc/hosts
 PORTLESS=0 pnpm dev              # Bypasses proxy, uses default port
 
 # Proxy control
-portless proxy start             # Start the proxy (port 80, daemon)
-portless proxy start --https     # Start with HTTP/2 + TLS (port 443)
+portless proxy start             # Start the HTTPS proxy (port 443, daemon)
+portless proxy start --no-tls    # Start without HTTPS (port 80)
 portless proxy start -p 1355     # Start on a custom port (no sudo)
 portless proxy start --foreground  # Start in foreground (for debugging)
 portless proxy start --wildcard  # Allow unregistered subdomains to fall back to parent
@@ -159,11 +149,11 @@ portless proxy stop              # Stop the proxy
 ### Options
 
 ```
--p, --port <number>              Port for the proxy (default: 443 with --https, 80 without)
---https                          Enable HTTP/2 + TLS with auto-generated certs
---cert <path>                    Use a custom TLS certificate (implies --https)
---key <path>                     Use a custom TLS private key (implies --https)
---no-tls                         Disable HTTPS (overrides PORTLESS_HTTPS)
+-p, --port <number>              Port for the proxy (default: 443, or 80 with --no-tls)
+--no-tls                         Disable HTTPS (use plain HTTP on port 80)
+--https                          Enable HTTPS (default, accepted for compatibility)
+--cert <path>                    Use a custom TLS certificate
+--key <path>                     Use a custom TLS private key
 --foreground                     Run proxy in foreground instead of daemon
 --tld <tld>                      Use a custom TLD instead of .localhost (e.g. test)
 --wildcard                       Allow unregistered subdomains to fall back to parent route
@@ -178,7 +168,7 @@ portless proxy stop              # Stop the proxy
 # Configuration
 PORTLESS_PORT=<number>           Override the default proxy port
 PORTLESS_APP_PORT=<number>       Use a fixed port for the app (same as --app-port)
-PORTLESS_HTTPS=1                 Always enable HTTPS
+PORTLESS_HTTPS=1                 Enable HTTPS (default, accepted for compatibility)
 PORTLESS_TLD=<tld>               Use a custom TLD (e.g. test; default: localhost)
 PORTLESS_WILDCARD=1              Allow unregistered subdomains to fall back to parent route
 PORTLESS_SYNC_HOSTS=1            Auto-sync /etc/hosts (auto-enabled for custom TLDs)

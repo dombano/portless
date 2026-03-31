@@ -23,7 +23,6 @@ import {
   getDefaultPort,
   getDefaultTld,
   injectFrameworkFlags,
-  isHttpsEnvEnabled,
   isWildcardEnvEnabled,
   isProxyRunning,
   isWindows,
@@ -402,8 +401,8 @@ async function runApp(
   // The proxy start command handles sudo elevation and fallback internally,
   // so we just spawn it and then re-discover state to find the actual port.
   if (!(await isProxyRunning(proxyPort, tls))) {
-    const wantHttps = isHttpsEnvEnabled();
-    const defaultPort = getDefaultPort(wantHttps);
+    // HTTPS is the default; the proxy start command will use it automatically.
+    const defaultPort = getDefaultPort(true);
     const needsSudo = !isWindows && defaultPort < PRIVILEGED_PORT_THRESHOLD;
 
     if (needsSudo && process.stdin.isTTY) {
@@ -423,7 +422,6 @@ async function runApp(
 
     console.log(chalk.yellow("Starting proxy..."));
     const startArgs = [process.argv[1], "proxy", "start"];
-    if (wantHttps) startArgs.push("--https");
     if (tld !== DEFAULT_TLD) startArgs.push("--tld", tld);
 
     const result = spawnSync(process.execPath, startArgs, {
@@ -601,9 +599,9 @@ ${chalk.bold("Name inference (in order):")}
   (e.g. feature-auth.myapp.localhost).
 
 ${chalk.bold("Examples:")}
-  portless run next dev               # -> http://<project>.localhost
-  portless run --name myapp next dev  # -> http://myapp.localhost
-  portless run vite dev               # -> http://<project>.localhost
+  portless run next dev               # -> https://<project>.localhost
+  portless run --name myapp next dev  # -> https://myapp.localhost
+  portless run vite dev               # -> https://<project>.localhost
   portless run --app-port 3000 pnpm start
 `);
       process.exit(0);
@@ -706,9 +704,9 @@ ${chalk.bold("Install:")}
   Do NOT add portless as a project dependency.
 
 ${chalk.bold("Usage:")}
-  ${chalk.cyan("portless proxy start")}             Start the proxy (background daemon)
-  ${chalk.cyan("portless proxy start --https")}     Start with HTTP/2 + TLS (auto-generates certs)
-  ${chalk.cyan("portless proxy start -p 80")}       Start on port 80 (requires sudo)
+  ${chalk.cyan("portless proxy start")}             Start the proxy (HTTPS on port 443, daemon)
+  ${chalk.cyan("portless proxy start --no-tls")}    Start without HTTPS (port 80)
+  ${chalk.cyan("portless proxy start -p 1355")}     Start on a custom port (no sudo)
   ${chalk.cyan("portless proxy stop")}              Stop the proxy
   ${chalk.cyan("portless <name> <cmd>")}            Run your app through the proxy
   ${chalk.cyan("portless run <cmd>")}               Infer name from project, run through proxy
@@ -721,14 +719,14 @@ ${chalk.bold("Usage:")}
   ${chalk.cyan("portless hosts clean")}             Remove portless entries from ${HOSTS_DISPLAY}
 
 ${chalk.bold("Examples:")}
-  portless proxy start                # Start proxy on port 80
-  portless proxy start --https        # Start with HTTPS/2 on port 443
-  portless myapp next dev             # -> http://myapp.localhost
-  portless myapp vite dev             # -> http://myapp.localhost
-  portless api.myapp pnpm start       # -> http://api.myapp.localhost
-  portless run next dev               # -> http://<project>.localhost
-  portless run next dev               # in worktree -> http://<worktree>.<project>.localhost
-  portless get backend                 # -> http://backend.localhost (for cross-service refs)
+  portless proxy start                # Start HTTPS proxy on port 443
+  portless proxy start --no-tls       # Start HTTP proxy on port 80
+  portless myapp next dev             # -> https://myapp.localhost
+  portless myapp vite dev             # -> https://myapp.localhost
+  portless api.myapp pnpm start       # -> https://api.myapp.localhost
+  portless run next dev               # -> https://<project>.localhost
+  portless run next dev               # in worktree -> https://<worktree>.<project>.localhost
+  portless get backend                 # -> https://backend.localhost (for cross-service refs)
   # Wildcard subdomains: tenant.myapp.localhost also routes to myapp
 
 ${chalk.bold("In package.json:")}
@@ -739,28 +737,28 @@ ${chalk.bold("In package.json:")}
   }
 
 ${chalk.bold("How it works:")}
-  1. Start the proxy once (port 80 or 443 with --https, auto-elevates with sudo)
+  1. Start the proxy once (HTTPS on port 443 by default, auto-elevates with sudo)
   2. Run your apps - they auto-start the proxy and register automatically
      (apps get a random port in the 4000-4999 range via PORT)
-  3. Access via http://<name>.localhost (or https:// with --https)
+  3. Access via https://<name>.localhost
   4. .localhost domains auto-resolve to 127.0.0.1
   5. Frameworks that ignore PORT (Vite, Astro, React Router, Angular,
      Expo, React Native) get --port and --host flags injected automatically
 
-${chalk.bold("HTTP/2 + HTTPS:")}
-  Use --https for HTTP/2 multiplexing (faster dev server page loads).
+${chalk.bold("HTTP/2 + HTTPS (default):")}
+  HTTPS with HTTP/2 multiplexing is enabled by default (faster page loads).
   On first use, portless generates a local CA and adds it to your
-  system trust store. No browser warnings. No sudo required on macOS.
+  system trust store. No browser warnings. Disable with --no-tls.
 
 ${chalk.bold("Options:")}
   run [--name <name>] <cmd>      Infer project name (or override with --name)
                                 Adds worktree prefix in git worktrees
-  -p, --port <number>           Port for the proxy (default: 443 with --https, 80 without)
+  -p, --port <number>           Port for the proxy (default: 443, or 80 with --no-tls)
                                 Standard ports auto-elevate with sudo on macOS/Linux
-  --https                       Enable HTTP/2 + TLS with auto-generated certs
-  --cert <path>                 Use a custom TLS certificate (implies --https)
-  --key <path>                  Use a custom TLS private key (implies --https)
-  --no-tls                      Disable HTTPS (overrides PORTLESS_HTTPS)
+  --no-tls                      Disable HTTPS (use plain HTTP on port 80)
+  --https                       Enable HTTPS (default, accepted for compatibility)
+  --cert <path>                 Use a custom TLS certificate
+  --key <path>                  Use a custom TLS private key
   --foreground                  Run proxy in foreground (for debugging)
   --tld <tld>                   Use a custom TLD instead of .localhost (e.g. test, dev)
   --wildcard                    Allow unregistered subdomains to fall back to parent route
@@ -772,7 +770,7 @@ ${chalk.bold("Options:")}
 ${chalk.bold("Environment variables:")}
   PORTLESS_PORT=<number>        Override the default proxy port (e.g. in .bashrc)
   PORTLESS_APP_PORT=<number>    Use a fixed port for the app (same as --app-port)
-  PORTLESS_HTTPS=1              Always enable HTTPS (set in .bashrc / .zshrc)
+  PORTLESS_HTTPS=1              Enable HTTPS (default, accepted for compatibility)
   PORTLESS_TLD=<tld>            Use a custom TLD (e.g. test, dev; default: localhost)
   PORTLESS_WILDCARD=1           Allow unregistered subdomains to fall back to parent route
   PORTLESS_SYNC_HOSTS=1         Auto-sync ${HOSTS_DISPLAY} (auto-enabled for custom TLDs)
@@ -1057,8 +1055,8 @@ async function handleProxy(args: string[]): Promise<void> {
 ${chalk.bold("portless proxy")} - Manage the portless proxy server.
 
 ${chalk.bold("Usage:")}
-  ${chalk.cyan("portless proxy start")}                Start the proxy on port 80 (daemon)
-  ${chalk.cyan("portless proxy start --https")}        Start with HTTP/2 + TLS on port 443
+  ${chalk.cyan("portless proxy start")}                Start the HTTPS proxy on port 443 (daemon)
+  ${chalk.cyan("portless proxy start --no-tls")}       Start without HTTPS (port 80)
   ${chalk.cyan("portless proxy start --foreground")}   Start in foreground (for debugging)
   ${chalk.cyan("portless proxy start -p 1355")}        Start on a custom port (no sudo)
   ${chalk.cyan("portless proxy start --tld test")}     Use .test instead of .localhost
@@ -1070,10 +1068,9 @@ ${chalk.bold("Usage:")}
 
   const isForeground = args.includes("--foreground");
 
-  // Parse HTTPS / TLS flags first -- the default port depends on them.
+  // HTTPS is on by default. Disable with --no-tls.
   const hasNoTls = args.includes("--no-tls");
-  const hasHttpsFlag = args.includes("--https");
-  const wantHttps = !hasNoTls && (hasHttpsFlag || isHttpsEnvEnabled());
+  const wantHttps = !hasNoTls;
 
   // Parse optional --cert / --key for custom certificates
   let customCertPath: string | null = null;

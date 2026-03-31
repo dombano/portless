@@ -1,6 +1,6 @@
 ---
 name: portless
-description: Set up and use portless for named local dev server URLs (e.g. http://myapp.localhost instead of http://localhost:3000). Use when integrating portless into a project, configuring dev server names, setting up the local proxy, working with .localhost domains, or troubleshooting port/proxy issues.
+description: Set up and use portless for named local dev server URLs (e.g. https://myapp.localhost instead of http://localhost:3000). Use when integrating portless into a project, configuring dev server names, setting up the local proxy, working with .localhost domains, or troubleshooting port/proxy issues.
 ---
 
 # Portless
@@ -35,16 +35,13 @@ npm install -g portless
 # Install globally
 npm install -g portless
 
-# Start the proxy (auto-elevates with sudo for port 80)
-portless proxy start
-
-# Run your app (auto-starts the proxy if needed)
+# Run your app (auto-starts the HTTPS proxy on port 443)
 portless run next dev
-# -> http://<project>.localhost
+# -> https://<project>.localhost
 
 # Or with an explicit name
 portless myapp next dev
-# -> http://myapp.localhost
+# -> https://myapp.localhost
 ```
 
 The proxy auto-starts when you run an app. You can also start it explicitly with `portless proxy start`.
@@ -66,12 +63,12 @@ The proxy auto-starts when you run an app. Or start it explicitly: `portless pro
 ### Multi-app setups with subdomains
 
 ```bash
-portless myapp next dev          # http://myapp.localhost
-portless api.myapp pnpm start    # http://api.myapp.localhost
-portless docs.myapp next dev     # http://docs.myapp.localhost
+portless myapp next dev          # https://myapp.localhost
+portless api.myapp pnpm start    # https://api.myapp.localhost
+portless docs.myapp next dev     # https://docs.myapp.localhost
 ```
 
-By default, only explicitly registered subdomains are routed (strict mode). Start the proxy with `--wildcard` to allow any subdomain of a registered route to fall back to that app (e.g. `tenant1.myapp.localhost` routes to the `myapp` app without extra registration). Exact matches always take priority over wildcards.
+By default, only explicitly registered subdomains are routed (strict mode). Start the proxy with `--wildcard` to allow any subdomain of a registered route to fall back to that app (e.g. `tenant1.myapp.localhost` routes to the `myapp` app). Exact matches always take priority over wildcards.
 
 ### Git worktrees
 
@@ -79,10 +76,10 @@ By default, only explicitly registered subdomains are routed (strict mode). Star
 
 ```bash
 # Main worktree -- no prefix
-portless run next dev   # -> http://myapp.localhost
+portless run next dev   # -> https://myapp.localhost
 
 # Linked worktree on branch "fix-ui"
-portless run next dev   # -> http://fix-ui.myapp.localhost
+portless run next dev   # -> https://fix-ui.myapp.localhost
 ```
 
 No config changes needed. Put `portless run` in `package.json` once and it works in all worktrees.
@@ -97,9 +94,9 @@ PORTLESS=0 pnpm dev   # Bypasses proxy, uses default port
 
 ## How It Works
 
-1. `portless proxy start` starts an HTTP reverse proxy on port 80 (or 443 with `--https`) as a background daemon. Auto-elevates with sudo on macOS/Linux; falls back to port 1355 if sudo is unavailable. Configurable with `-p` / `--port` or the `PORTLESS_PORT` env var. The proxy also auto-starts when you run an app.
+1. `portless proxy start` starts an HTTPS reverse proxy on port 443 as a background daemon. Auto-elevates with sudo on macOS/Linux; falls back to port 1355 if sudo is unavailable. Use `--no-tls` for plain HTTP on port 80. Configurable with `-p` / `--port` or the `PORTLESS_PORT` env var. The proxy also auto-starts when you run an app.
 2. `portless <name> <cmd>` assigns a random free port (4000-4999) via the `PORT` env var and registers the app with the proxy
-3. The browser hits `http://<name>.localhost` (or `https://` with HTTPS); the proxy forwards to the app's assigned port
+3. The browser hits `https://<name>.localhost`; the proxy forwards to the app's assigned port
 
 `.localhost` domains resolve to `127.0.0.1` natively in Chrome, Firefox, and Edge. Safari relies on the system DNS resolver, which may not handle `.localhost` subdomains on all configurations. Run `sudo portless hosts sync` to add entries to `/etc/hosts` if needed.
 
@@ -121,7 +118,7 @@ Override with the `PORTLESS_STATE_DIR` environment variable.
 | --------------------- | --------------------------------------------------------------------- |
 | `PORTLESS_PORT`       | Override the default proxy port (default: 443 with HTTPS, 80 without) |
 | `PORTLESS_APP_PORT`   | Use a fixed port for the app (skip auto-assignment)                   |
-| `PORTLESS_HTTPS`      | Set to `1` to always enable HTTPS/HTTP/2                              |
+| `PORTLESS_HTTPS`      | Enable HTTPS (default, accepted for compatibility)                    |
 | `PORTLESS_TLD`        | Use a custom TLD instead of localhost (e.g. test)                     |
 | `PORTLESS_WILDCARD`   | Set to `1` to allow unregistered subdomains to fall back to parent    |
 | `PORTLESS_SYNC_HOSTS` | Set to `1` to auto-sync /etc/hosts (auto-enabled for custom TLDs)     |
@@ -130,15 +127,13 @@ Override with the `PORTLESS_STATE_DIR` environment variable.
 
 ### HTTP/2 + HTTPS
 
-Use `--https` for HTTP/2 multiplexing (faster page loads for dev servers with many files):
+HTTPS with HTTP/2 is enabled by default (faster page loads for dev servers with many files). First run generates a local CA and adds it to the system trust store. After that, no prompts and no browser warnings.
 
 ```bash
-portless proxy start --https                  # Auto-generate certs and trust CA
 portless proxy start --cert ./c.pem --key ./k.pem  # Use custom certs
-sudo portless trust                           # Add CA to trust store later
+portless proxy start --no-tls                       # Disable HTTPS (plain HTTP)
+sudo portless trust                                 # Add CA to trust store later
 ```
-
-First run generates a local CA and prompts for sudo to add it to the system trust store. After that, no prompts and no browser warnings. Set `PORTLESS_HTTPS=1` in `.bashrc`/`.zshrc` to make it permanent.
 
 On Linux, `portless trust` supports Debian/Ubuntu, Arch, Fedora/RHEL/CentOS, and openSUSE (via `update-ca-certificates` or `update-ca-trust`). On Windows, it uses `certutil` to add the CA to the system trust store.
 
@@ -148,13 +143,13 @@ On Linux, `portless trust` supports Debian/Ubuntu, Arch, Fedora/RHEL/CentOS, and
 | -------------------------------------- | ----------------------------------------------------------- |
 | `portless run <cmd> [args...]`         | Infer name from project, run through proxy (auto-starts)    |
 | `portless run --name <name> <cmd>`     | Override inferred base name (worktree prefix still applies) |
-| `portless <name> <cmd> [args...]`      | Run app at `http://<name>.localhost` (auto-starts proxy)    |
+| `portless <name> <cmd> [args...]`      | Run app at `https://<name>.localhost` (auto-starts proxy)   |
 | `portless get <name>`                  | Print URL for a service (for cross-service wiring)          |
 | `portless get <name> --no-worktree`    | Print URL without worktree prefix                           |
 | `portless list`                        | Show active routes                                          |
 | `portless trust`                       | Add local CA to system trust store (for HTTPS)              |
-| `portless proxy start`                 | Start the proxy as a daemon (port 80, auto-elevates)        |
-| `portless proxy start --https`         | Start with HTTP/2 + TLS (auto-generates certs)              |
+| `portless proxy start`                 | Start HTTPS proxy as a daemon (port 443, auto-elevates)     |
+| `portless proxy start --no-tls`        | Start without HTTPS (plain HTTP on port 80)                 |
 | `portless proxy start -p <number>`     | Start the proxy on a custom port                            |
 | `portless proxy start --tld test`      | Use .test instead of .localhost (requires /etc/hosts sync)  |
 | `portless proxy start --foreground`    | Start the proxy in foreground (for debugging)               |
