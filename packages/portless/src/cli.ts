@@ -89,7 +89,7 @@ function collectPortlessEnvArgs(): string[] {
  */
 function sudoStop(port: number): boolean {
   const stopArgs = [process.execPath, getEntryScript(), "proxy", "stop", "-p", String(port)];
-  console.log(colors.yellow("Elevating with sudo to stop the proxy..."));
+  console.log(colors.yellow("Proxy is running as root. Elevating with sudo to stop it..."));
   const result = spawnSync("sudo", ["env", ...collectPortlessEnvArgs(), ...stopArgs], {
     stdio: "inherit",
     timeout: SUDO_SPAWN_TIMEOUT_MS,
@@ -461,11 +461,17 @@ async function runApp(
     const needsSudo = !isWindows && defaultPort < PRIVILEGED_PORT_THRESHOLD;
 
     if (needsSudo && !process.stdin.isTTY) {
-      console.error(colors.red("Proxy is not running."));
-      console.error(colors.blue("Start the proxy first:"));
+      console.error(colors.red("Proxy is not running and no TTY is available for sudo."));
+      console.error(
+        colors.blue("Option 1 -- start the proxy in a terminal (will prompt for sudo):")
+      );
       console.error(colors.cyan("  portless proxy start"));
-      console.error(colors.blue("Or use an unprivileged port (no sudo prompt):"));
-      console.error(colors.cyan("  portless proxy start -p 1355"));
+      console.error(
+        colors.blue(
+          `Option 2 -- use an unprivileged port (no sudo needed, URLs will include :${FALLBACK_PROXY_PORT}):`
+        )
+      );
+      console.error(colors.cyan(`  portless proxy start -p ${FALLBACK_PROXY_PORT}`));
       process.exit(1);
     }
 
@@ -888,7 +894,7 @@ async function handleTrust(): Promise<void> {
   const isPermissionError =
     result.error?.includes("Permission denied") || result.error?.includes("EACCES");
   if (isPermissionError && !isWindows && process.getuid?.() !== 0) {
-    console.log(colors.yellow("Elevating with sudo to trust the CA..."));
+    console.log(colors.yellow("Trusting the CA requires elevated privileges. Requesting sudo..."));
     const sudoResult = spawnSync("sudo", [process.execPath, getEntryScript(), "trust"], {
       stdio: "inherit",
       timeout: SUDO_SPAWN_TIMEOUT_MS,
@@ -1062,7 +1068,11 @@ ${colors.bold("Auto-sync:")}
     }
 
     if (!isWindows && process.getuid?.() !== 0) {
-      console.log(colors.yellow("Elevating with sudo to update hosts file..."));
+      console.log(
+        colors.yellow(
+          `Writing to ${HOSTS_DISPLAY} requires elevated privileges. Requesting sudo...`
+        )
+      );
       const result = spawnSync(
         "sudo",
         ["env", ...collectPortlessEnvArgs(), process.execPath, getEntryScript(), "hosts", "clean"],
@@ -1119,7 +1129,9 @@ ${colors.bold("Usage: portless hosts <command>")}
   }
 
   if (!isWindows && process.getuid?.() !== 0) {
-    console.log(colors.yellow("Elevating with sudo to update hosts file..."));
+    console.log(
+      colors.yellow(`Writing to ${HOSTS_DISPLAY} requires elevated privileges. Requesting sudo...`)
+    );
     const result = spawnSync(
       "sudo",
       ["env", ...collectPortlessEnvArgs(), process.execPath, getEntryScript(), "hosts", "sync"],
@@ -1324,7 +1336,16 @@ ${colors.bold("Usage:")}
     const startArgs = [...baseArgs, ...optionalFlags];
     const extraFlags = optionalFlags.map((a) => ` ${a}`).join("");
 
-    console.log(colors.yellow(`Port ${proxyPort} requires elevated privileges.`));
+    console.log(
+      colors.yellow(`Port ${proxyPort} requires elevated privileges. Requesting sudo...`)
+    );
+    if (!hasExplicitPort) {
+      console.log(
+        colors.gray(
+          `(To skip sudo, use an unprivileged port: portless proxy start -p ${FALLBACK_PROXY_PORT}${extraFlags})`
+        )
+      );
+    }
     const result = spawnSync("sudo", ["env", ...collectPortlessEnvArgs(), ...startArgs], {
       stdio: "inherit",
       timeout: SUDO_SPAWN_TIMEOUT_MS,
