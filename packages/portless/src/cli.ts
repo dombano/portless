@@ -58,9 +58,8 @@ const SUDO_SPAWN_TIMEOUT_MS = 30_000;
 /**
  * Re-run `portless proxy stop` under sudo. Returns true if sudo succeeded.
  */
-function sudoStop(proxyPort: number): boolean {
+function sudoStop(): boolean {
   const stopArgs = [process.execPath, process.argv[1], "proxy", "stop"];
-  if (proxyPort !== getDefaultPort()) stopArgs.push("-p", String(proxyPort));
   console.log(chalk.yellow("Elevating with sudo to stop the proxy..."));
   const result = spawnSync("sudo", stopArgs, {
     stdio: "inherit",
@@ -242,7 +241,7 @@ async function stopProxy(store: RouteStore, proxyPort: number, _tls: boolean): P
         } catch (err: unknown) {
           if (isErrnoException(err) && err.code === "EPERM") {
             if (!isWindows) {
-              sudoStop(proxyPort);
+              sudoStop();
             } else {
               console.error(
                 chalk.red("Permission denied. The proxy was started with elevated privileges.")
@@ -262,7 +261,7 @@ async function stopProxy(store: RouteStore, proxyPort: number, _tls: boolean): P
           }
         }
       } else if (!isWindows && process.getuid?.() !== 0) {
-        sudoStop(proxyPort);
+        sudoStop();
       } else {
         console.error(chalk.red(`Could not identify the process on port ${proxyPort}.`));
         console.error(chalk.blue("Try manually:"));
@@ -293,7 +292,7 @@ async function stopProxy(store: RouteStore, proxyPort: number, _tls: boolean): P
       if (isErrnoException(err) && err.code === "EPERM") {
         // Process exists but is owned by root -- auto-elevate to stop it
         if (!isWindows) {
-          sudoStop(proxyPort);
+          sudoStop();
           return;
         }
       }
@@ -332,7 +331,7 @@ async function stopProxy(store: RouteStore, proxyPort: number, _tls: boolean): P
   } catch (err: unknown) {
     if (isErrnoException(err) && err.code === "EPERM") {
       if (!isWindows) {
-        sudoStop(proxyPort);
+        sudoStop();
       } else {
         console.error(
           chalk.red("Permission denied. The proxy was started with elevated privileges.")
@@ -839,8 +838,11 @@ async function handleTrust(): Promise<void> {
     return;
   }
 
-  // Auto-elevate with sudo on macOS/Linux
-  if (!isWindows && process.getuid?.() !== 0) {
+  // Auto-elevate with sudo on macOS/Linux, but only for permission errors.
+  // Non-permission failures (missing cert, unsupported platform) skip sudo.
+  const isPermissionError =
+    result.error?.includes("Permission denied") || result.error?.includes("EACCES");
+  if (isPermissionError && !isWindows && process.getuid?.() !== 0) {
     console.log(chalk.yellow("Elevating with sudo to trust the CA..."));
     const sudoResult = spawnSync("sudo", [process.execPath, process.argv[1], "trust"], {
       stdio: "inherit",
@@ -1267,6 +1269,10 @@ ${chalk.bold("Usage:")}
         console.log(chalk.green(`Proxy started on port ${proxyPort}.`));
       }
       return;
+    }
+
+    if (result.signal) {
+      process.exit(1);
     }
 
     // sudo failed -- fall back to the unprivileged port if the user didn't
