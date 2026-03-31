@@ -43,3 +43,65 @@ To prepare a release:
 5. Open a PR and merge to `main`
 
 CI compares the version in `packages/portless/package.json` to what's on npm. If it differs, it builds, publishes, and creates the GitHub release automatically. The release body is extracted from the content between the markers.
+
+## Windows Debugging
+
+A remote Windows Server 2022 EC2 instance is available for debugging Windows-specific issues. It uses AWS Systems Manager (SSM) with no SSH or open ports. Commands run via `aws ssm send-command` and return stdout/stderr.
+
+### Prerequisites
+
+The instance must be provisioned first (one-time, by a human):
+
+```bash
+./scripts/windows-debug/provision.sh
+```
+
+Requires: AWS CLI v2 configured with `ec2:*`, `iam:CreateRole`, `iam:AttachRolePolicy`, `ssm:SendCommand`, `ssm:GetCommandInvocation` permissions and a default VPC.
+
+### Usage
+
+Start the instance (if stopped):
+
+```bash
+./scripts/windows-debug/start.sh
+```
+
+Run a command on Windows:
+
+```bash
+./scripts/windows-debug/run.sh "<powershell-command>"
+```
+
+Sync the current git branch and rebuild:
+
+```bash
+./scripts/windows-debug/sync.sh
+```
+
+Stop the instance when done (avoids cost):
+
+```bash
+./scripts/windows-debug/stop.sh
+```
+
+### Common Workflows
+
+Run unit tests on Windows:
+
+```bash
+./scripts/windows-debug/run.sh "cd C:\portless && pnpm test"
+```
+
+Run e2e tests on Windows:
+
+```bash
+./scripts/windows-debug/run.sh "cd C:\portless && pnpm test:e2e"
+```
+
+Check bootstrap progress (first boot only):
+
+```bash
+./scripts/windows-debug/run.sh "Get-Content C:\bootstrap.log"
+```
+
+The repo lives at `C:\portless` on the instance. Node.js 20, pnpm, Git, and OpenSSL are pre-installed. The `run.sh` wrapper automatically adds these tools to PATH.
