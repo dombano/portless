@@ -1215,6 +1215,7 @@ ${chalk.bold("Usage:")}
       "-p",
       String(proxyPort),
     ];
+    if (hasNoTls) startArgs.push("--no-tls");
     if (tld !== DEFAULT_TLD) startArgs.push("--tld", tld);
     if (useWildcard) startArgs.push("--wildcard");
     if (isForeground) startArgs.push("--foreground");
