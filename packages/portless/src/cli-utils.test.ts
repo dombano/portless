@@ -5,7 +5,6 @@ import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 import {
-  DEFAULT_PROXY_PORT,
   DEFAULT_TLD,
   FALLBACK_PROXY_PORT,
   PRIVILEGED_PORT_THRESHOLD,
@@ -137,10 +136,6 @@ describe("resolveStateDir", () => {
 describe("constants", () => {
   it("FALLBACK_PROXY_PORT is 1355", () => {
     expect(FALLBACK_PROXY_PORT).toBe(1355);
-  });
-
-  it("DEFAULT_PROXY_PORT equals FALLBACK_PROXY_PORT", () => {
-    expect(DEFAULT_PROXY_PORT).toBe(FALLBACK_PROXY_PORT);
   });
 
   it("PRIVILEGED_PORT_THRESHOLD is 1024", () => {

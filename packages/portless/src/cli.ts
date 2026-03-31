@@ -56,18 +56,26 @@ const EXIT_TIMEOUT_MS = 2000;
 const SUDO_SPAWN_TIMEOUT_MS = 30_000;
 
 /**
- * Re-run `portless proxy stop` under sudo. Returns true if sudo succeeded.
+ * Collect PORTLESS_* env vars as KEY=VALUE strings suitable for
+ * `sudo env KEY=VAL ...` invocations (sudo may strip the environment).
  */
-function sudoStop(): boolean {
-  const stopArgs = [process.execPath, process.argv[1], "proxy", "stop"];
+function collectPortlessEnvArgs(): string[] {
   const envArgs: string[] = [];
   for (const key of Object.keys(process.env)) {
     if (key.startsWith("PORTLESS_") && process.env[key]) {
       envArgs.push(`${key}=${process.env[key]}`);
     }
   }
+  return envArgs;
+}
+
+/**
+ * Re-run `portless proxy stop` under sudo. Returns true if sudo succeeded.
+ */
+function sudoStop(): boolean {
+  const stopArgs = [process.execPath, process.argv[1], "proxy", "stop"];
   console.log(chalk.yellow("Elevating with sudo to stop the proxy..."));
-  const result = spawnSync("sudo", ["env", ...envArgs, ...stopArgs], {
+  const result = spawnSync("sudo", ["env", ...collectPortlessEnvArgs(), ...stopArgs], {
     stdio: "inherit",
     timeout: SUDO_SPAWN_TIMEOUT_MS,
   });
@@ -437,13 +445,13 @@ async function runApp(
   // The proxy start command handles sudo elevation and fallback internally,
   // so we just spawn it and then re-discover state to find the actual port.
   if (!(await isProxyRunning(proxyPort, tls))) {
-    // HTTPS is the default; the proxy start command will use it automatically.
-    const defaultPort = getDefaultPort(true);
+    const wantTls = !isHttpsEnvDisabled();
+    const defaultPort = getDefaultPort(wantTls);
     const needsSudo = !isWindows && defaultPort < PRIVILEGED_PORT_THRESHOLD;
 
     if (needsSudo && !process.stdin.isTTY) {
       console.error(chalk.red("Proxy is not running."));
-      console.error(chalk.blue("Start the proxy first (requires sudo for port 443):"));
+      console.error(chalk.blue(`Start the proxy first (requires sudo for port ${defaultPort}):`));
       console.error(chalk.cyan("  sudo portless proxy start"));
       console.error(chalk.blue("Or use an unprivileged port (no sudo):"));
       console.error(chalk.cyan("  portless proxy start -p 1355"));
@@ -1257,14 +1265,6 @@ ${chalk.bold("Usage:")}
   // Privileged ports require root on Unix. Auto-elevate with sudo when
   // possible, falling back to the unprivileged port when sudo is unavailable.
   if (!isWindows && proxyPort < PRIVILEGED_PORT_THRESHOLD && (process.getuid?.() ?? -1) !== 0) {
-    const noTlsFlag = hasNoTls ? " --no-tls" : "";
-    const tldFlag = tld !== DEFAULT_TLD ? ` --tld ${tld}` : "";
-    const wildcardFlag = useWildcard ? " --wildcard" : "";
-    const fgFlag = isForeground ? " --foreground" : "";
-    const certFlags =
-      customCertPath && customKeyPath ? ` --cert ${customCertPath} --key ${customKeyPath}` : "";
-    const extraFlags = `${noTlsFlag}${tldFlag}${wildcardFlag}${fgFlag}${certFlags}`;
-
     const startArgs = [
       process.execPath,
       process.argv[1],
@@ -1280,8 +1280,13 @@ ${chalk.bold("Usage:")}
     if (customCertPath && customKeyPath)
       startArgs.push("--cert", customCertPath, "--key", customKeyPath);
 
+    const extraFlags = startArgs
+      .slice(6)
+      .map((a) => ` ${a}`)
+      .join("");
+
     console.log(chalk.yellow(`Port ${proxyPort} requires elevated privileges.`));
-    const result = spawnSync("sudo", startArgs, {
+    const result = spawnSync("sudo", ["env", ...collectPortlessEnvArgs(), ...startArgs], {
       stdio: "inherit",
       timeout: SUDO_SPAWN_TIMEOUT_MS,
     });

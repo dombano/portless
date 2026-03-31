@@ -373,7 +373,11 @@ export function createProxyServer(options: ProxyServerOptions): ProxyServer {
       res.writeHead(302, { Location: location, [PORTLESS_HEADER]: "1" });
       res.end();
     });
-    plainServer.on("upgrade", (_req: http.IncomingMessage, socket: net.Socket) => {
+    plainServer.on("upgrade", (req: http.IncomingMessage, socket: net.Socket) => {
+      const host = getRequestHost(req);
+      console.warn(
+        `[portless] Dropped plain-HTTP WebSocket upgrade for ${host} -- use wss:// instead`
+      );
       socket.destroy();
     });
 
