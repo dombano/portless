@@ -368,7 +368,7 @@ export function createProxyServer(options: ProxyServerOptions): ProxyServer {
     const plainServer = http.createServer((req, res) => {
       const host = getRequestHost(req).split(":")[0] || "localhost";
       const location = `https://${host}${proxyPort === 443 ? "" : `:${proxyPort}`}${req.url || "/"}`;
-      res.writeHead(301, { Location: location });
+      res.writeHead(302, { Location: location });
       res.end();
     });
     plainServer.on("upgrade", (_req: http.IncomingMessage, socket: net.Socket) => {

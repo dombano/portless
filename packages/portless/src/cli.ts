@@ -429,10 +429,10 @@ async function runApp(
       stdio: "inherit",
       timeout: SUDO_SPAWN_TIMEOUT_MS,
     });
+    // Re-discover state: the proxy may have started on the standard port
+    // (443/80), the fallback (1355), or a user-configured port.
+    const discovered = await discoverState();
     if (result.status !== 0) {
-      // A concurrent portless run may have already started the proxy, or
-      // handleProxy may have fallen back to a different port. Re-discover.
-      const discovered = await discoverState();
       if (!(await isProxyRunning(discovered.port))) {
         console.error(chalk.red("Failed to start proxy."));
         console.error(chalk.blue("Try starting it manually:"));
@@ -440,10 +440,6 @@ async function runApp(
         process.exit(1);
       }
     }
-
-    // Re-discover state: the proxy may have started on the standard port
-    // (443/80), the fallback (1355), or a user-configured port.
-    const discovered = await discoverState();
     proxyPort = discovered.port;
     stateDir = discovered.dir;
     tld = discovered.tld;
@@ -1192,13 +1188,12 @@ ${chalk.bold("Usage:")}
   // Privileged ports require root on Unix. Auto-elevate with sudo when
   // possible, falling back to the unprivileged port when sudo is unavailable.
   if (!isWindows && proxyPort < PRIVILEGED_PORT_THRESHOLD && (process.getuid?.() ?? -1) !== 0) {
-    const httpsFlag = useHttps ? " --https" : "";
     const tldFlag = tld !== DEFAULT_TLD ? ` --tld ${tld}` : "";
     const wildcardFlag = useWildcard ? " --wildcard" : "";
     const fgFlag = isForeground ? " --foreground" : "";
     const certFlags =
       customCertPath && customKeyPath ? ` --cert ${customCertPath} --key ${customKeyPath}` : "";
-    const extraFlags = `${httpsFlag}${tldFlag}${wildcardFlag}${fgFlag}${certFlags}`;
+    const extraFlags = `${tldFlag}${wildcardFlag}${fgFlag}${certFlags}`;
 
     const startArgs = [
       process.execPath,
@@ -1208,7 +1203,6 @@ ${chalk.bold("Usage:")}
       "-p",
       String(proxyPort),
     ];
-    if (useHttps) startArgs.push("--https");
     if (tld !== DEFAULT_TLD) startArgs.push("--tld", tld);
     if (useWildcard) startArgs.push("--wildcard");
     if (isForeground) startArgs.push("--foreground");

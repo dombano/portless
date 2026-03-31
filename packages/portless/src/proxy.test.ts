@@ -1266,7 +1266,7 @@ describe("createProxyServer with TLS (HTTP/2)", () => {
     await listen(server);
 
     const res = await request(server, { host: "myapp.localhost", path: "/dashboard" });
-    expect(res.status).toBe(301);
+    expect(res.status).toBe(302);
     expect(res.headers.location).toBe("https://myapp.localhost/dashboard");
   });
 
@@ -1282,7 +1282,7 @@ describe("createProxyServer with TLS (HTTP/2)", () => {
     await listen(server);
 
     const res = await request(server, { host: "myapp.localhost" });
-    expect(res.status).toBe(301);
+    expect(res.status).toBe(302);
     expect(res.headers.location).toBe(`https://myapp.localhost:${TEST_PROXY_PORT}/`);
   });
 
