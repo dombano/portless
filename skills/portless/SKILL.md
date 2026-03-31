@@ -35,16 +35,16 @@ npm install -g portless
 # Install globally
 npm install -g portless
 
-# Start the proxy (once, no sudo needed)
+# Start the proxy (auto-elevates with sudo for port 80)
 portless proxy start
 
 # Run your app (auto-starts the proxy if needed)
 portless run next dev
-# -> http://<project>.localhost:1355
+# -> http://<project>.localhost
 
 # Or with an explicit name
 portless myapp next dev
-# -> http://myapp.localhost:1355
+# -> http://myapp.localhost
 ```
 
 The proxy auto-starts when you run an app. You can also start it explicitly with `portless proxy start`.
@@ -66,12 +66,12 @@ The proxy auto-starts when you run an app. Or start it explicitly: `portless pro
 ### Multi-app setups with subdomains
 
 ```bash
-portless myapp next dev          # http://myapp.localhost:1355
-portless api.myapp pnpm start    # http://api.myapp.localhost:1355
-portless docs.myapp next dev     # http://docs.myapp.localhost:1355
+portless myapp next dev          # http://myapp.localhost
+portless api.myapp pnpm start    # http://api.myapp.localhost
+portless docs.myapp next dev     # http://docs.myapp.localhost
 ```
 
-By default, only explicitly registered subdomains are routed (strict mode). Start the proxy with `--wildcard` to allow any subdomain of a registered route to fall back to that app (e.g. `tenant1.myapp.localhost:1355` routes to the `myapp` app without extra registration). Exact matches always take priority over wildcards.
+By default, only explicitly registered subdomains are routed (strict mode). Start the proxy with `--wildcard` to allow any subdomain of a registered route to fall back to that app (e.g. `tenant1.myapp.localhost` routes to the `myapp` app without extra registration). Exact matches always take priority over wildcards.
 
 ### Git worktrees
 
@@ -79,10 +79,10 @@ By default, only explicitly registered subdomains are routed (strict mode). Star
 
 ```bash
 # Main worktree -- no prefix
-portless run next dev   # -> http://myapp.localhost:1355
+portless run next dev   # -> http://myapp.localhost
 
 # Linked worktree on branch "fix-ui"
-portless run next dev   # -> http://fix-ui.myapp.localhost:1355
+portless run next dev   # -> http://fix-ui.myapp.localhost
 ```
 
 No config changes needed. Put `portless run` in `package.json` once and it works in all worktrees.
@@ -97,9 +97,9 @@ PORTLESS=0 pnpm dev   # Bypasses proxy, uses default port
 
 ## How It Works
 
-1. `portless proxy start` starts an HTTP reverse proxy on port 1355 as a background daemon (configurable with `-p` / `--port` or the `PORTLESS_PORT` env var). The proxy also auto-starts when you run an app.
+1. `portless proxy start` starts an HTTP reverse proxy on port 80 (or 443 with `--https`) as a background daemon. Auto-elevates with sudo on macOS/Linux; falls back to port 1355 if sudo is unavailable. Configurable with `-p` / `--port` or the `PORTLESS_PORT` env var. The proxy also auto-starts when you run an app.
 2. `portless <name> <cmd>` assigns a random free port (4000-4999) via the `PORT` env var and registers the app with the proxy
-3. The browser hits `http://<name>.localhost:1355` on the proxy port; the proxy forwards to the app's assigned port
+3. The browser hits `http://<name>.localhost` (or `https://` with HTTPS); the proxy forwards to the app's assigned port
 
 `.localhost` domains resolve to `127.0.0.1` natively in Chrome, Firefox, and Edge. Safari relies on the system DNS resolver, which may not handle `.localhost` subdomains on all configurations. Run `sudo portless hosts sync` to add entries to `/etc/hosts` if needed.
 
@@ -117,16 +117,16 @@ Override with the `PORTLESS_STATE_DIR` environment variable.
 
 ### Environment variables
 
-| Variable              | Description                                                        |
-| --------------------- | ------------------------------------------------------------------ |
-| `PORTLESS_PORT`       | Override the default proxy port (default: 1355)                    |
-| `PORTLESS_APP_PORT`   | Use a fixed port for the app (skip auto-assignment)                |
-| `PORTLESS_HTTPS`      | Set to `1` to always enable HTTPS/HTTP/2                           |
-| `PORTLESS_TLD`        | Use a custom TLD instead of localhost (e.g. test)                  |
-| `PORTLESS_WILDCARD`   | Set to `1` to allow unregistered subdomains to fall back to parent |
-| `PORTLESS_SYNC_HOSTS` | Set to `1` to auto-sync /etc/hosts (auto-enabled for custom TLDs)  |
-| `PORTLESS_STATE_DIR`  | Override the state directory                                       |
-| `PORTLESS=0`          | Bypass the proxy, run the command directly                         |
+| Variable              | Description                                                           |
+| --------------------- | --------------------------------------------------------------------- |
+| `PORTLESS_PORT`       | Override the default proxy port (default: 443 with HTTPS, 80 without) |
+| `PORTLESS_APP_PORT`   | Use a fixed port for the app (skip auto-assignment)                   |
+| `PORTLESS_HTTPS`      | Set to `1` to always enable HTTPS/HTTP/2                              |
+| `PORTLESS_TLD`        | Use a custom TLD instead of localhost (e.g. test)                     |
+| `PORTLESS_WILDCARD`   | Set to `1` to allow unregistered subdomains to fall back to parent    |
+| `PORTLESS_SYNC_HOSTS` | Set to `1` to auto-sync /etc/hosts (auto-enabled for custom TLDs)     |
+| `PORTLESS_STATE_DIR`  | Override the state directory                                          |
+| `PORTLESS=0`          | Bypass the proxy, run the command directly                            |
 
 ### HTTP/2 + HTTPS
 
@@ -144,34 +144,34 @@ On Linux, `portless trust` supports Debian/Ubuntu, Arch, Fedora/RHEL/CentOS, and
 
 ## CLI Reference
 
-| Command                                | Description                                                   |
-| -------------------------------------- | ------------------------------------------------------------- |
-| `portless run <cmd> [args...]`         | Infer name from project, run through proxy (auto-starts)      |
-| `portless run --name <name> <cmd>`     | Override inferred base name (worktree prefix still applies)   |
-| `portless <name> <cmd> [args...]`      | Run app at `http://<name>.localhost:1355` (auto-starts proxy) |
-| `portless get <name>`                  | Print URL for a service (for cross-service wiring)            |
-| `portless get <name> --no-worktree`    | Print URL without worktree prefix                             |
-| `portless list`                        | Show active routes                                            |
-| `portless trust`                       | Add local CA to system trust store (for HTTPS)                |
-| `portless proxy start`                 | Start the proxy as a daemon (port 1355, no sudo)              |
-| `portless proxy start --https`         | Start with HTTP/2 + TLS (auto-generates certs)                |
-| `portless proxy start -p <number>`     | Start the proxy on a custom port                              |
-| `portless proxy start --tld test`      | Use .test instead of .localhost (requires /etc/hosts sync)    |
-| `portless proxy start --foreground`    | Start the proxy in foreground (for debugging)                 |
-| `portless proxy start --wildcard`      | Allow unregistered subdomains to fall back to parent route    |
-| `portless proxy stop`                  | Stop the proxy                                                |
-| `portless alias <name> <port>`         | Register a static route (e.g. for Docker containers)          |
-| `portless alias <name> <port> --force` | Overwrite an existing route                                   |
-| `portless alias --remove <name>`       | Remove a static route                                         |
-| `portless hosts sync`                  | Add routes to /etc/hosts (fixes Safari)                       |
-| `portless hosts clean`                 | Remove portless entries from /etc/hosts                       |
-| `portless <name> --app-port <n> <cmd>` | Use a fixed port for the app instead of auto-assignment       |
-| `portless <name> --force <cmd>`        | Override an existing route registered by another process      |
-| `portless --name <name> <cmd>`         | Force `<name>` as app name (bypasses subcommand dispatch)     |
-| `portless <name> -- <cmd> [args...]`   | Stop flag parsing; everything after `--` is passed to child   |
-| `portless --help` / `-h`               | Show help                                                     |
-| `portless run --help`                  | Show help for a subcommand (also: alias, hosts)               |
-| `portless --version` / `-v`            | Show version                                                  |
+| Command                                | Description                                                 |
+| -------------------------------------- | ----------------------------------------------------------- |
+| `portless run <cmd> [args...]`         | Infer name from project, run through proxy (auto-starts)    |
+| `portless run --name <name> <cmd>`     | Override inferred base name (worktree prefix still applies) |
+| `portless <name> <cmd> [args...]`      | Run app at `http://<name>.localhost` (auto-starts proxy)    |
+| `portless get <name>`                  | Print URL for a service (for cross-service wiring)          |
+| `portless get <name> --no-worktree`    | Print URL without worktree prefix                           |
+| `portless list`                        | Show active routes                                          |
+| `portless trust`                       | Add local CA to system trust store (for HTTPS)              |
+| `portless proxy start`                 | Start the proxy as a daemon (port 80, auto-elevates)        |
+| `portless proxy start --https`         | Start with HTTP/2 + TLS (auto-generates certs)              |
+| `portless proxy start -p <number>`     | Start the proxy on a custom port                            |
+| `portless proxy start --tld test`      | Use .test instead of .localhost (requires /etc/hosts sync)  |
+| `portless proxy start --foreground`    | Start the proxy in foreground (for debugging)               |
+| `portless proxy start --wildcard`      | Allow unregistered subdomains to fall back to parent route  |
+| `portless proxy stop`                  | Stop the proxy                                              |
+| `portless alias <name> <port>`         | Register a static route (e.g. for Docker containers)        |
+| `portless alias <name> <port> --force` | Overwrite an existing route                                 |
+| `portless alias --remove <name>`       | Remove a static route                                       |
+| `portless hosts sync`                  | Add routes to /etc/hosts (fixes Safari)                     |
+| `portless hosts clean`                 | Remove portless entries from /etc/hosts                     |
+| `portless <name> --app-port <n> <cmd>` | Use a fixed port for the app instead of auto-assignment     |
+| `portless <name> --force <cmd>`        | Override an existing route registered by another process    |
+| `portless --name <name> <cmd>`         | Force `<name>` as app name (bypasses subcommand dispatch)   |
+| `portless <name> -- <cmd> [args...]`   | Stop flag parsing; everything after `--` is passed to child |
+| `portless --help` / `-h`               | Show help                                                   |
+| `portless run --help`                  | Show help for a subcommand (also: alias, hosts)             |
+| `portless --version` / `-v`            | Show version                                                |
 
 **Reserved names:** `run`, `get`, `alias`, `hosts`, `list`, `trust`, and `proxy` are subcommands and cannot be used as app names directly. Use `portless run <cmd>` to infer the name, or `portless --name <name> <cmd>` to force any name including reserved ones.
 
@@ -204,11 +204,11 @@ For other frameworks that don't read `PORT`, pass the port manually:
 
 ### Permission errors
 
-Ports below 1024 require `sudo`. The default port (1355) does not need sudo. If you want to use port 80:
+The default ports (80 for HTTP, 443 for HTTPS) require `sudo` on macOS and Linux. Portless auto-elevates with sudo when needed. If sudo is unavailable, it falls back to port 1355 (no sudo needed). On Windows, no elevation is required.
 
 ```bash
-sudo portless proxy start -p 80       # Port 80, requires sudo
-portless proxy start                   # Port 1355, no sudo needed
+portless proxy start --https           # Auto-elevates with sudo for port 443
+portless proxy start -p 1355 --https   # No sudo needed (URLs include :1355)
 portless proxy stop                    # Stop (use sudo if started with sudo)
 ```
 
@@ -237,7 +237,7 @@ This adds the portless local CA to your system trust store. After that, restart 
 
 ### Proxy loop (508 Loop Detected)
 
-If your dev server proxies requests to another portless app (e.g. Vite proxying `/api` to `api.myapp.localhost:1355`), the proxy must rewrite the `Host` header. Without this, portless routes the request back to the original app, creating an infinite loop.
+If your dev server proxies requests to another portless app (e.g. Vite proxying `/api` to `api.myapp.localhost`), the proxy must rewrite the `Host` header. Without this, portless routes the request back to the original app, creating an infinite loop.
 
 Fix: set `changeOrigin: true` in the proxy config (Vite, webpack-dev-server, etc.):
 
@@ -245,7 +245,7 @@ Fix: set `changeOrigin: true` in the proxy config (Vite, webpack-dev-server, etc
 // vite.config.ts
 proxy: {
   "/api": {
-    target: "http://api.myapp.localhost:1355",
+    target: "http://api.myapp.localhost",
     changeOrigin: true,
     ws: true,
   },

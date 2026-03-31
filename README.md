@@ -24,9 +24,9 @@ portless proxy start --https
 portless myapp next dev
 # -> https://myapp.localhost
 
-# Without --https, runs on port 1355
+# Without --https (port 80)
 portless myapp next dev
-# -> http://myapp.localhost:1355
+# -> http://myapp.localhost
 ```
 
 The proxy auto-starts when you run an app. A random port (4000--4999) is assigned via the `PORT` environment variable. Most frameworks (Next.js, Express, Nuxt, etc.) respect this automatically. For frameworks that ignore `PORT` (Vite, Astro, React Router, Angular, Expo, React Native), portless auto-injects `--port` and `--host` flags.
@@ -47,13 +47,13 @@ Organize services with subdomains:
 
 ```bash
 portless api.myapp pnpm start
-# -> http://api.myapp.localhost:1355
+# -> http://api.myapp.localhost
 
 portless docs.myapp next dev
-# -> http://docs.myapp.localhost:1355
+# -> http://docs.myapp.localhost
 ```
 
-By default, only explicitly registered subdomains are routed (strict mode). Use `--wildcard` when starting the proxy to allow any subdomain of a registered route to fall back to that app (e.g. `tenant1.myapp.localhost:1355` routes to the `myapp` app without extra registration).
+By default, only explicitly registered subdomains are routed (strict mode). Use `--wildcard` when starting the proxy to allow any subdomain of a registered route to fall back to that app (e.g. `tenant1.myapp.localhost` routes to the `myapp` app without extra registration).
 
 ## Git Worktrees
 
@@ -61,16 +61,16 @@ By default, only explicitly registered subdomains are routed (strict mode). Use 
 
 ```bash
 # Main worktree -- no prefix
-portless run next dev   # -> http://myapp.localhost:1355
+portless run next dev   # -> http://myapp.localhost
 
 # Linked worktree on branch "fix-ui"
-portless run next dev   # -> http://fix-ui.myapp.localhost:1355
+portless run next dev   # -> http://fix-ui.myapp.localhost
 ```
 
 Use `--name` to override the inferred base name while keeping the worktree prefix:
 
 ```bash
-portless run --name myapp next dev   # -> http://fix-ui.myapp.localhost:1355
+portless run --name myapp next dev   # -> http://fix-ui.myapp.localhost
 ```
 
 Put `portless run` in your `package.json` once and it works everywhere -- the main checkout uses the plain name, each worktree gets a unique subdomain. No collisions, no `--force`.
@@ -93,19 +93,19 @@ Recommended: `.test` (IANA-reserved, no collision risk). Avoid `.local` (conflic
 
 ```mermaid
 flowchart TD
-    Browser["Browser<br>myapp.localhost:1355"]
-    Proxy["portless proxy<br>(port 1355)"]
+    Browser["Browser<br>myapp.localhost"]
+    Proxy["portless proxy<br>(port 80 or 443)"]
     App1[":4123<br>myapp"]
     App2[":4567<br>api"]
 
-    Browser -->|port 1355| Proxy
+    Browser --> Proxy
     Proxy --> App1
     Proxy --> App2
 ```
 
 1. **Start the proxy** -- auto-starts when you run an app, or start explicitly with `portless proxy start`
 2. **Run apps** -- `portless <name> <command>` assigns a free port and registers with the proxy
-3. **Access via URL** -- `http://<name>.localhost:1355` routes through the proxy to your app
+3. **Access via URL** -- `http://<name>.localhost` routes through the proxy to your app
 
 ## HTTP/2 + HTTPS
 
@@ -135,7 +135,7 @@ On Linux, `portless trust` supports Debian/Ubuntu, Arch, Fedora/RHEL/CentOS, and
 
 ```bash
 portless run [--name <name>] <cmd> [args...]  # Infer name (or override with --name), run through proxy
-portless <name> <cmd> [args...]  # Run app at http://<name>.localhost:1355
+portless <name> <cmd> [args...]  # Run app at http://<name>.localhost
 portless alias <name> <port>     # Register a static route (e.g. for Docker)
 portless alias <name> <port> --force  # Overwrite an existing route
 portless alias --remove <name>   # Remove a static route
@@ -148,9 +148,9 @@ portless hosts clean             # Remove portless entries from /etc/hosts
 PORTLESS=0 pnpm dev              # Bypasses proxy, uses default port
 
 # Proxy control
-portless proxy start             # Start the proxy (port 1355, daemon)
-portless proxy start --https     # Start with HTTP/2 + TLS
-portless proxy start -p 80       # Start on port 80 (requires sudo)
+portless proxy start             # Start the proxy (port 80, daemon)
+portless proxy start --https     # Start with HTTP/2 + TLS (port 443)
+portless proxy start -p 1355     # Start on a custom port (no sudo)
 portless proxy start --foreground  # Start in foreground (for debugging)
 portless proxy start --wildcard  # Allow unregistered subdomains to fall back to parent
 portless proxy stop              # Stop the proxy
@@ -159,7 +159,7 @@ portless proxy stop              # Stop the proxy
 ### Options
 
 ```
--p, --port <number>              Port for the proxy (default: 1355)
+-p, --port <number>              Port for the proxy (default: 443 with --https, 80 without)
 --https                          Enable HTTP/2 + TLS with auto-generated certs
 --cert <path>                    Use a custom TLS certificate (implies --https)
 --key <path>                     Use a custom TLS private key (implies --https)
@@ -215,7 +215,7 @@ If your frontend dev server (e.g. Vite, webpack) proxies API requests to another
 server: {
   proxy: {
     "/api": {
-      target: "http://api.myapp.localhost:1355",
+      target: "http://api.myapp.localhost",
       changeOrigin: true,
       ws: true,
     },
@@ -229,7 +229,7 @@ server: {
 devServer: {
   proxy: [{
     context: ["/api"],
-    target: "http://api.myapp.localhost:1355",
+    target: "http://api.myapp.localhost",
     changeOrigin: true,
   }],
 }

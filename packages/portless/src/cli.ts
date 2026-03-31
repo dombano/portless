@@ -14,6 +14,7 @@ import { FILE_MODE, RouteConflictError, RouteStore } from "./routes.js";
 import { inferProjectName, detectWorktreePrefix, truncateLabel } from "./auto.js";
 import {
   DEFAULT_TLD,
+  FALLBACK_PROXY_PORT,
   PRIVILEGED_PORT_THRESHOLD,
   RISKY_TLDS,
   discoverState,
@@ -27,8 +28,6 @@ import {
   isProxyRunning,
   isWindows,
   prompt,
-  readTldFromDir,
-  readTlsMarker,
   resolveStateDir,
   spawnCommand,
   validateTld,
@@ -360,7 +359,7 @@ function listRoutes(store: RouteStore, proxyPort: number, tls: boolean): void {
 }
 
 async function runApp(
-  store: RouteStore,
+  initialStore: RouteStore,
   proxyPort: number,
   stateDir: string,
   name: string,
@@ -371,6 +370,7 @@ async function runApp(
   autoInfo?: { nameSource: string; prefix?: string; prefixSource?: string },
   desiredPort?: number
 ) {
+  let store = initialStore;
   const hostname = parseHostname(name, tld);
 
   let envTld: string;
@@ -398,23 +398,15 @@ async function runApp(
     }
   }
 
-  // Check if proxy is running, auto-start if possible
+  // Check if proxy is running, auto-start if possible.
+  // The proxy start command handles sudo elevation and fallback internally,
+  // so we just spawn it and then re-discover state to find the actual port.
   if (!(await isProxyRunning(proxyPort, tls))) {
-    const defaultPort = getDefaultPort();
-    const needsSudo = !isWindows && defaultPort < PRIVILEGED_PORT_THRESHOLD;
     const wantHttps = isHttpsEnvEnabled();
+    const defaultPort = getDefaultPort(wantHttps);
+    const needsSudo = !isWindows && defaultPort < PRIVILEGED_PORT_THRESHOLD;
 
-    if (needsSudo) {
-      // Privileged port requires sudo -- must prompt interactively
-      if (!process.stdin.isTTY) {
-        console.error(chalk.red("Proxy is not running."));
-        console.error(chalk.blue("Start the proxy first (requires sudo for this port):"));
-        console.error(chalk.cyan("  sudo portless proxy start -p 80"));
-        console.error(chalk.blue("Or use the default port (no sudo needed):"));
-        console.error(chalk.cyan("  portless proxy start"));
-        process.exit(1);
-      }
-
+    if (needsSudo && process.stdin.isTTY) {
       const answer = await prompt(chalk.yellow("Proxy not running. Start it? [Y/n/skip] "));
 
       if (answer === "n" || answer === "no") {
@@ -427,53 +419,40 @@ async function runApp(
         spawnCommand(commandArgs);
         return;
       }
+    }
 
-      console.log(chalk.yellow("Starting proxy (requires sudo)..."));
-      const startArgs = [process.execPath, process.argv[1], "proxy", "start"];
-      if (wantHttps) startArgs.push("--https");
-      if (tld !== DEFAULT_TLD) startArgs.push("--tld", tld);
-      const result = spawnSync("sudo", startArgs, {
-        stdio: "inherit",
-        timeout: SUDO_SPAWN_TIMEOUT_MS,
-      });
-      if (result.status !== 0) {
-        // A concurrent portless run may have already started the proxy.
-        // Check before failing -- if it is running, we can continue.
-        if (!(await isProxyRunning(proxyPort))) {
-          console.error(chalk.red("Failed to start proxy."));
-          console.error(chalk.blue("Try starting it manually:"));
-          console.error(chalk.cyan("  sudo portless proxy start"));
-          process.exit(1);
-        }
-      }
-    } else {
-      // Non-privileged port -- auto-start silently, no prompt needed
-      console.log(chalk.yellow("Starting proxy..."));
-      const startArgs = [process.argv[1], "proxy", "start"];
-      if (wantHttps) startArgs.push("--https");
-      if (tld !== DEFAULT_TLD) startArgs.push("--tld", tld);
-      const result = spawnSync(process.execPath, startArgs, {
-        stdio: "inherit",
-        timeout: SUDO_SPAWN_TIMEOUT_MS,
-      });
-      if (result.status !== 0) {
-        // A concurrent portless run may have already started the proxy.
-        // Check before failing -- if it is running, we can continue.
-        if (!(await isProxyRunning(proxyPort))) {
-          console.error(chalk.red("Failed to start proxy."));
-          console.error(chalk.blue("Try starting it manually:"));
-          console.error(chalk.cyan("  portless proxy start"));
-          process.exit(1);
-        }
+    console.log(chalk.yellow("Starting proxy..."));
+    const startArgs = [process.argv[1], "proxy", "start"];
+    if (wantHttps) startArgs.push("--https");
+    if (tld !== DEFAULT_TLD) startArgs.push("--tld", tld);
+
+    const result = spawnSync(process.execPath, startArgs, {
+      stdio: "inherit",
+      timeout: SUDO_SPAWN_TIMEOUT_MS,
+    });
+    if (result.status !== 0) {
+      // A concurrent portless run may have already started the proxy, or
+      // handleProxy may have fallen back to a different port. Re-discover.
+      const discovered = await discoverState();
+      if (!(await isProxyRunning(discovered.port))) {
+        console.error(chalk.red("Failed to start proxy."));
+        console.error(chalk.blue("Try starting it manually:"));
+        console.error(chalk.cyan(`  ${needsSudo ? "sudo " : ""}portless proxy start`));
+        process.exit(1);
       }
     }
 
-    // Re-read TLS/TLD state after auto-start
-    const autoTls = readTlsMarker(stateDir);
-    tld = readTldFromDir(stateDir);
+    // Re-discover state: the proxy may have started on the standard port
+    // (443/80), the fallback (1355), or a user-configured port.
+    const discovered = await discoverState();
+    proxyPort = discovered.port;
+    stateDir = discovered.dir;
+    tld = discovered.tld;
+    store = new RouteStore(stateDir, {
+      onWarning: (msg: string) => console.warn(chalk.yellow(msg)),
+    });
 
-    // Wait for proxy to be ready
-    if (!(await waitForProxy(defaultPort, undefined, undefined, autoTls))) {
+    if (!(await waitForProxy(proxyPort, undefined, undefined, discovered.tls))) {
       console.error(chalk.red("Proxy failed to start (timed out waiting for it to listen)."));
       const logPath = path.join(stateDir, "proxy.log");
       console.error(chalk.blue("Try starting the proxy manually to see the error:"));
@@ -484,8 +463,7 @@ async function runApp(
       process.exit(1);
     }
 
-    // Update tls/URL for newly started proxy
-    tls = autoTls;
+    tls = discovered.tls;
     console.log(chalk.green("Proxy started in background"));
   } else {
     console.log(chalk.gray("-- Proxy is running"));
@@ -623,9 +601,9 @@ ${chalk.bold("Name inference (in order):")}
   (e.g. feature-auth.myapp.localhost).
 
 ${chalk.bold("Examples:")}
-  portless run next dev               # -> http://<project>.localhost:1355
-  portless run --name myapp next dev  # -> http://myapp.localhost:1355
-  portless run vite dev               # -> http://<project>.localhost:1355
+  portless run next dev               # -> http://<project>.localhost
+  portless run --name myapp next dev  # -> http://myapp.localhost
+  portless run vite dev               # -> http://<project>.localhost
   portless run --app-port 3000 pnpm start
 `);
       process.exit(0);
@@ -743,14 +721,14 @@ ${chalk.bold("Usage:")}
   ${chalk.cyan("portless hosts clean")}             Remove portless entries from ${HOSTS_DISPLAY}
 
 ${chalk.bold("Examples:")}
-  portless proxy start                # Start proxy on port 1355
-  portless proxy start --https        # Start with HTTPS/2 (faster page loads)
-  portless myapp next dev             # -> http://myapp.localhost:1355
-  portless myapp vite dev             # -> http://myapp.localhost:1355
-  portless api.myapp pnpm start       # -> http://api.myapp.localhost:1355
-  portless run next dev               # -> http://<project>.localhost:1355
-  portless run next dev               # in worktree -> http://<worktree>.<project>.localhost:1355
-  portless get backend                 # -> http://backend.localhost:1355 (for cross-service refs)
+  portless proxy start                # Start proxy on port 80
+  portless proxy start --https        # Start with HTTPS/2 on port 443
+  portless myapp next dev             # -> http://myapp.localhost
+  portless myapp vite dev             # -> http://myapp.localhost
+  portless api.myapp pnpm start       # -> http://api.myapp.localhost
+  portless run next dev               # -> http://<project>.localhost
+  portless run next dev               # in worktree -> http://<worktree>.<project>.localhost
+  portless get backend                 # -> http://backend.localhost (for cross-service refs)
   # Wildcard subdomains: tenant.myapp.localhost also routes to myapp
 
 ${chalk.bold("In package.json:")}
@@ -761,10 +739,10 @@ ${chalk.bold("In package.json:")}
   }
 
 ${chalk.bold("How it works:")}
-  1. Start the proxy once (listens on port 1355 by default, no sudo needed)
+  1. Start the proxy once (port 80 or 443 with --https, auto-elevates with sudo)
   2. Run your apps - they auto-start the proxy and register automatically
      (apps get a random port in the 4000-4999 range via PORT)
-  3. Access via http://<name>.localhost:1355
+  3. Access via http://<name>.localhost (or https:// with --https)
   4. .localhost domains auto-resolve to 127.0.0.1
   5. Frameworks that ignore PORT (Vite, Astro, React Router, Angular,
      Expo, React Native) get --port and --host flags injected automatically
@@ -777,8 +755,8 @@ ${chalk.bold("HTTP/2 + HTTPS:")}
 ${chalk.bold("Options:")}
   run [--name <name>] <cmd>      Infer project name (or override with --name)
                                 Adds worktree prefix in git worktrees
-  -p, --port <number>           Port for the proxy to listen on (default: 1355)
-                                Ports < 1024 require sudo
+  -p, --port <number>           Port for the proxy (default: 443 with --https, 80 without)
+                                Standard ports auto-elevate with sudo on macOS/Linux
   --https                       Enable HTTP/2 + TLS with auto-generated certs
   --cert <path>                 Use a custom TLS certificate (implies --https)
   --key <path>                  Use a custom TLS private key (implies --https)
@@ -804,7 +782,7 @@ ${chalk.bold("Environment variables:")}
 ${chalk.bold("Child process environment:")}
   PORT                          Ephemeral port the child should listen on
   HOST                          Always 127.0.0.1
-  PORTLESS_URL                  Public URL of the app (e.g. http://myapp.localhost:1355)
+  PORTLESS_URL                  Public URL of the app (e.g. https://myapp.localhost)
 
 ${chalk.bold("Safari / DNS:")}
   .localhost subdomains auto-resolve in Chrome, Firefox, and Edge.
@@ -874,9 +852,9 @@ ${chalk.bold("Options:")}
   --help, -h             Show this help
 
 ${chalk.bold("Examples:")}
-  portless get backend                  # -> http://backend.localhost:1355
-  portless get backend                  # in worktree -> http://auth.backend.localhost:1355
-  portless get backend --no-worktree    # -> http://backend.localhost:1355 (skip worktree)
+  portless get backend                  # -> http://backend.localhost
+  portless get backend                  # in worktree -> http://auth.backend.localhost
+  portless get backend --no-worktree    # -> http://backend.localhost (skip worktree)
 `);
     process.exit(0);
   }
@@ -927,8 +905,8 @@ ${chalk.bold("Usage:")}
   ${chalk.cyan("portless alias <name> <port> --force")} Override existing route
 
 ${chalk.bold("Examples:")}
-  portless alias my-postgres 5432     # -> http://my-postgres.localhost:1355
-  portless alias redis 6379           # -> http://redis.localhost:1355
+  portless alias my-postgres 5432     # -> http://my-postgres.localhost
+  portless alias redis 6379           # -> http://redis.localhost
   portless alias --remove my-postgres # Remove the alias
 `);
     process.exit(0);
@@ -1079,10 +1057,10 @@ async function handleProxy(args: string[]): Promise<void> {
 ${chalk.bold("portless proxy")} - Manage the portless proxy server.
 
 ${chalk.bold("Usage:")}
-  ${chalk.cyan("portless proxy start")}                Start the proxy (daemon)
-  ${chalk.cyan("portless proxy start --https")}        Start with HTTP/2 + TLS
+  ${chalk.cyan("portless proxy start")}                Start the proxy on port 80 (daemon)
+  ${chalk.cyan("portless proxy start --https")}        Start with HTTP/2 + TLS on port 443
   ${chalk.cyan("portless proxy start --foreground")}   Start in foreground (for debugging)
-  ${chalk.cyan("portless proxy start -p 80")}          Start on port 80 (requires sudo)
+  ${chalk.cyan("portless proxy start -p 1355")}        Start on a custom port (no sudo)
   ${chalk.cyan("portless proxy start --tld test")}     Use .test instead of .localhost
   ${chalk.cyan("portless proxy start --wildcard")}     Allow unregistered subdomains to fall back to parent
   ${chalk.cyan("portless proxy stop")}                 Stop the proxy
@@ -1092,27 +1070,7 @@ ${chalk.bold("Usage:")}
 
   const isForeground = args.includes("--foreground");
 
-  // Parse --port / -p flag
-  let proxyPort = getDefaultPort();
-  let portFlagIndex = args.indexOf("--port");
-  if (portFlagIndex === -1) portFlagIndex = args.indexOf("-p");
-  if (portFlagIndex !== -1) {
-    const portValue = args[portFlagIndex + 1];
-    if (!portValue || portValue.startsWith("-")) {
-      console.error(chalk.red("Error: --port / -p requires a port number."));
-      console.error(chalk.blue("Usage:"));
-      console.error(chalk.cyan("  portless proxy start -p 8080"));
-      process.exit(1);
-    }
-    proxyPort = parseInt(portValue, 10);
-    if (isNaN(proxyPort) || proxyPort < 1 || proxyPort > 65535) {
-      console.error(chalk.red(`Error: Invalid port number: ${portValue}`));
-      console.error(chalk.blue("Port must be between 1 and 65535."));
-      process.exit(1);
-    }
-  }
-
-  // Parse HTTPS / TLS flags
+  // Parse HTTPS / TLS flags first -- the default port depends on them.
   const hasNoTls = args.includes("--no-tls");
   const hasHttpsFlag = args.includes("--https");
   const wantHttps = !hasNoTls && (hasHttpsFlag || isHttpsEnvEnabled());
@@ -1139,6 +1097,32 @@ ${chalk.bold("Usage:")}
   if ((customCertPath && !customKeyPath) || (!customCertPath && customKeyPath)) {
     console.error(chalk.red("Error: --cert and --key must be used together."));
     process.exit(1);
+  }
+
+  // Custom cert/key implies HTTPS
+  const useHttps = wantHttps || !!(customCertPath && customKeyPath);
+
+  // Parse --port / -p flag. When not set, default to the protocol-standard
+  // port (443 for HTTPS, 80 for HTTP) so URLs are clean.
+  let hasExplicitPort = false;
+  let proxyPort = getDefaultPort(useHttps);
+  let portFlagIndex = args.indexOf("--port");
+  if (portFlagIndex === -1) portFlagIndex = args.indexOf("-p");
+  if (portFlagIndex !== -1) {
+    const portValue = args[portFlagIndex + 1];
+    if (!portValue || portValue.startsWith("-")) {
+      console.error(chalk.red("Error: --port / -p requires a port number."));
+      console.error(chalk.blue("Usage:"));
+      console.error(chalk.cyan("  portless proxy start -p 8080"));
+      process.exit(1);
+    }
+    proxyPort = parseInt(portValue, 10);
+    if (isNaN(proxyPort) || proxyPort < 1 || proxyPort > 65535) {
+      console.error(chalk.red(`Error: Invalid port number: ${portValue}`));
+      console.error(chalk.blue("Port must be between 1 and 65535."));
+      process.exit(1);
+    }
+    hasExplicitPort = true;
   }
 
   // Parse --tld flag
@@ -1183,9 +1167,6 @@ ${chalk.bold("Usage:")}
   // Parse --wildcard flag (disables the default strict subdomain matching)
   const useWildcard = args.includes("--wildcard") || isWildcardEnvEnabled();
 
-  // Custom cert/key implies HTTPS
-  const useHttps = wantHttps || !!(customCertPath && customKeyPath);
-
   // Resolve state directory based on the port
   const stateDir = resolveStateDir(proxyPort);
   const store = new RouteStore(stateDir, {
@@ -1200,7 +1181,7 @@ ${chalk.bold("Usage:")}
     }
     const needsSudo = !isWindows && proxyPort < PRIVILEGED_PORT_THRESHOLD;
     const sudoPrefix = needsSudo ? "sudo " : "";
-    const portFlag = proxyPort !== getDefaultPort() ? ` -p ${proxyPort}` : "";
+    const portFlag = hasExplicitPort ? ` -p ${proxyPort}` : "";
     console.log(chalk.yellow(`Proxy is already running on port ${proxyPort}.`));
     console.log(
       chalk.blue(
@@ -1210,13 +1191,75 @@ ${chalk.bold("Usage:")}
     return;
   }
 
-  // Check if running as root (only required for privileged ports on Unix)
+  // Privileged ports require root on Unix. Auto-elevate with sudo when
+  // possible, falling back to the unprivileged port when sudo is unavailable.
   if (!isWindows && proxyPort < PRIVILEGED_PORT_THRESHOLD && (process.getuid?.() ?? -1) !== 0) {
-    console.error(chalk.red(`Error: Port ${proxyPort} requires sudo.`));
-    console.error(chalk.blue("Either run with sudo:"));
-    console.error(chalk.cyan("  sudo portless proxy start -p 80"));
-    console.error(chalk.blue("Or use the default port (no sudo needed):"));
-    console.error(chalk.cyan("  portless proxy start"));
+    const httpsFlag = useHttps ? " --https" : "";
+    const tldFlag = tld !== DEFAULT_TLD ? ` --tld ${tld}` : "";
+    const wildcardFlag = useWildcard ? " --wildcard" : "";
+    const fgFlag = isForeground ? " --foreground" : "";
+    const certFlags =
+      customCertPath && customKeyPath ? ` --cert ${customCertPath} --key ${customKeyPath}` : "";
+    const extraFlags = `${httpsFlag}${tldFlag}${wildcardFlag}${fgFlag}${certFlags}`;
+
+    const startArgs = [
+      process.execPath,
+      process.argv[1],
+      "proxy",
+      "start",
+      "-p",
+      String(proxyPort),
+    ];
+    if (useHttps) startArgs.push("--https");
+    if (tld !== DEFAULT_TLD) startArgs.push("--tld", tld);
+    if (useWildcard) startArgs.push("--wildcard");
+    if (isForeground) startArgs.push("--foreground");
+    if (customCertPath && customKeyPath)
+      startArgs.push("--cert", customCertPath, "--key", customKeyPath);
+
+    console.log(chalk.yellow(`Port ${proxyPort} requires elevated privileges.`));
+    const result = spawnSync("sudo", startArgs, {
+      stdio: "inherit",
+      timeout: SUDO_SPAWN_TIMEOUT_MS,
+    });
+
+    if (result.status === 0) {
+      if (!isForeground && (await waitForProxy(proxyPort))) {
+        console.log(chalk.green(`Proxy started on port ${proxyPort}.`));
+      }
+      return;
+    }
+
+    // sudo failed -- fall back to the unprivileged port if the user didn't
+    // explicitly request a privileged one.
+    if (!hasExplicitPort) {
+      proxyPort = FALLBACK_PROXY_PORT;
+      console.log(chalk.yellow(`Falling back to port ${proxyPort}.`));
+      console.log(chalk.blue(`For clean URLs without port numbers, run:`));
+      console.log(chalk.cyan(`  sudo portless proxy start${extraFlags}`));
+
+      if (await isProxyRunning(proxyPort)) {
+        console.log(chalk.yellow(`Proxy is already running on port ${proxyPort}.`));
+        return;
+      }
+
+      // Continue below with the fallback port -- reassign store/stateDir
+      // by recursing with an explicit -p flag so the rest of handleProxy
+      // runs against the fallback port.
+      const fallbackArgs = ["proxy", "start", "-p", String(proxyPort)];
+      if (useHttps) fallbackArgs.push("--https");
+      if (tld !== DEFAULT_TLD) fallbackArgs.push("--tld", tld);
+      if (useWildcard) fallbackArgs.push("--wildcard");
+      if (isForeground) fallbackArgs.push("--foreground");
+      if (customCertPath && customKeyPath)
+        fallbackArgs.push("--cert", customCertPath, "--key", customKeyPath);
+      return handleProxy(fallbackArgs);
+    }
+
+    // Explicit port was requested but sudo failed -- error out.
+    console.error(chalk.red(`Error: Port ${proxyPort} requires sudo and elevation failed.`));
+    console.error(chalk.blue("Run with sudo:"));
+    console.error(chalk.cyan(`  sudo portless proxy start -p ${proxyPort}${extraFlags}`));
     process.exit(1);
   }
 

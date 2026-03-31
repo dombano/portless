@@ -15,8 +15,14 @@ import { PORTLESS_HEADER } from "./proxy.js";
 /** True when running on Windows. */
 export const isWindows = process.platform === "win32";
 
-/** Default proxy port. Uses an unprivileged port so sudo is not required. */
-export const DEFAULT_PROXY_PORT = 1355;
+/** Unprivileged fallback port used when standard ports are unavailable. */
+export const FALLBACK_PROXY_PORT = 1355;
+
+/**
+ * @deprecated Use FALLBACK_PROXY_PORT instead. Kept for backward compatibility
+ * with tests and external consumers.
+ */
+export const DEFAULT_PROXY_PORT = FALLBACK_PROXY_PORT;
 
 /** Ports below this threshold require root/sudo to bind (Unix only). */
 export const PRIVILEGED_PORT_THRESHOLD = 1024;
@@ -68,16 +74,26 @@ export const SIGNAL_CODES: Record<string, number> = {
 // ---------------------------------------------------------------------------
 
 /**
- * Return the effective default proxy port. Reads the PORTLESS_PORT env var
- * first, falling back to DEFAULT_PROXY_PORT (1355).
+ * Return the protocol-standard port for the given scheme.
+ * HTTPS -> 443, HTTP -> 80.
  */
-export function getDefaultPort(): number {
+export function getProtocolPort(tls: boolean): number {
+  return tls ? 443 : 80;
+}
+
+/**
+ * Return the effective default proxy port. Reads the PORTLESS_PORT env var
+ * first, then falls back to the protocol-standard port (443 for HTTPS,
+ * 80 for HTTP). When `tls` is undefined the legacy fallback (1355) is used
+ * so callers that don't yet know the protocol get backward-compatible behavior.
+ */
+export function getDefaultPort(tls?: boolean): number {
   const envPort = process.env.PORTLESS_PORT;
   if (envPort) {
     const port = parseInt(envPort, 10);
     if (!isNaN(port) && port >= 1 && port <= 65535) return port;
   }
-  return DEFAULT_PROXY_PORT;
+  return tls === undefined ? FALLBACK_PROXY_PORT : getProtocolPort(tls);
 }
 
 // ---------------------------------------------------------------------------
@@ -266,8 +282,10 @@ export async function discoverState(): Promise<{
   // State files didn't help. Probe well-known ports as a last resort --
   // privileged-port proxies store state in /tmp which macOS cleans on reboot,
   // so the daemon may still be alive after the port file is gone.
-  const defaultPort = getDefaultPort();
-  const probePorts = new Set([defaultPort, 443, 80]);
+  // Standard ports first (443, 80) since those are the new defaults, then the
+  // legacy fallback port, then any PORTLESS_PORT override.
+  const envPort = getDefaultPort();
+  const probePorts = new Set([443, 80, FALLBACK_PROXY_PORT, envPort]);
   for (const port of probePorts) {
     if (await isProxyRunning(port)) {
       const dir = resolveStateDir(port);
@@ -277,7 +295,7 @@ export async function discoverState(): Promise<{
     }
   }
 
-  return { dir: resolveStateDir(defaultPort), port: defaultPort, tls: false, tld: getDefaultTld() };
+  return { dir: resolveStateDir(envPort), port: envPort, tls: false, tld: getDefaultTld() };
 }
 
 // ---------------------------------------------------------------------------

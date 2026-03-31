@@ -67,8 +67,8 @@ portless alias --remove <name>
 Register a route for a service not managed by portless (e.g. a Docker container). Aliases persist across stale-route cleanup.
 
 ```bash
-portless alias my-postgres 5432     # -> http://my-postgres.localhost:1355
-portless alias redis 6379           # -> http://redis.localhost:1355
+portless alias my-postgres 5432     # -> http://my-postgres.localhost
+portless alias redis 6379           # -> http://redis.localhost
 portless alias --remove my-postgres # remove the alias
 ```
 
@@ -106,7 +106,7 @@ portless proxy start
   <tbody>
     <tr>
       <td>`-p, --port <number>`</td>
-      <td>Proxy port (default: 1355). Below 1024 requires sudo.</td>
+      <td>Proxy port (default: 443 with --https, 80 without). Auto-elevates with sudo.</td>
     </tr>
     <tr>
       <td>`--https`</td>
