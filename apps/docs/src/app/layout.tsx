@@ -11,7 +11,7 @@ import { cookies } from "next/headers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://portless.dev"),
+  metadataBase: new URL("https://portless.sh"),
   title: {
     default: "portless | Named .localhost URLs for Development",
     template: "%s | portless",
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://portless.dev",
+    url: "https://portless.sh",
     siteName: "portless",
     title: "portless | Named .localhost URLs for Development",
     description: "Replace port numbers with stable, named .localhost URLs. For humans and agents.",
