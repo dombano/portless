@@ -1,8 +1,25 @@
 # Changelog
 
-## 0.9.1
+## 0.9.2
 
 <!-- release:start -->
+
+### New Features
+
+- **Origin/Referer header rewriting**: The proxy now rewrites `Origin` and `Referer` headers for portless-managed hostnames so backend CSRF protections accept proxied requests (#189)
+
+### Bug Fixes
+
+- **Browser-blocked ports excluded from auto-selection**: Ports that browsers refuse to connect to (e.g. 6666, 6667) are now excluded from automatic port assignment (#192)
+- **State directory preserved during sudo elevation**: Fix `portless trust` losing the state directory when elevating to sudo (#187)
+- **Windows OpenSSL config detection**: Auto-detect `openssl.cnf` location on Windows when `OPENSSLDIR` points to a non-existent path (#183)
+
+### Contributors
+
+- @ctate
+<!-- release:end -->
+
+## 0.9.1
 
 ### New Features
 
@@ -15,7 +32,6 @@
 ### Contributors
 
 - @ctate
-<!-- release:end -->
 
 ## 0.9.0
 
