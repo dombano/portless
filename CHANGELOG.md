@@ -1,8 +1,19 @@
 # Changelog
 
-## 0.9.2
+## 0.9.3
 
 <!-- release:start -->
+
+### Breaking Changes
+
+- **Origin/Referer header rewriting removed**: The proxy no longer rewrites `Origin` and `Referer` headers. The feature introduced in 0.9.2 caused issues with certain backend frameworks and has been removed. (#195)
+
+### Contributors
+
+- @ctate
+<!-- release:end -->
+
+## 0.9.2
 
 ### New Features
 
@@ -17,7 +28,6 @@
 ### Contributors
 
 - @ctate
-<!-- release:end -->
 
 ## 0.9.1
 
