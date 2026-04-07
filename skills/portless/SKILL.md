@@ -126,7 +126,7 @@ Override with the `PORTLESS_STATE_DIR` environment variable.
 | `PORTLESS_LAN`        | Set to `1` to always enable LAN mode (auto-detects LAN IP)            |
 | `PORTLESS_TLD`        | Use a custom TLD instead of localhost (e.g. test)                     |
 | `PORTLESS_WILDCARD`   | Set to `1` to allow unregistered subdomains to fall back to parent    |
-| `PORTLESS_SYNC_HOSTS` | Set to `1` to auto-sync /etc/hosts (auto-enabled for custom TLDs)     |
+| `PORTLESS_SYNC_HOSTS` | Set to `0` to disable auto-sync of /etc/hosts (on by default)         |
 | `PORTLESS_STATE_DIR`  | Override the state directory                                          |
 | `PORTLESS=0`          | Bypass the proxy, run the command directly                            |
 
@@ -182,7 +182,7 @@ LAN mode depends on the system mDNS helpers that portless launches: macOS includ
 | `portless proxy start --no-tls`        | Start without HTTPS (plain HTTP on port 80)                    |
 | `portless proxy start --lan`           | Start in LAN mode (mDNS `.local`, auto-follows LAN IP changes) |
 | `portless proxy start -p <number>`     | Start the proxy on a custom port                               |
-| `portless proxy start --tld test`      | Use .test instead of .localhost (requires /etc/hosts sync)     |
+| `portless proxy start --tld test`      | Use .test instead of .localhost                                |
 | `portless proxy start --foreground`    | Start the proxy in foreground (for debugging)                  |
 | `portless proxy start --wildcard`      | Allow unregistered subdomains to fall back to parent route     |
 | `portless proxy stop`                  | Stop the proxy                                                 |
@@ -249,7 +249,7 @@ portless hosts sync    # Adds current routes to /etc/hosts
 portless hosts clean   # Remove entries later
 ```
 
-Auto-syncs `/etc/hosts` for custom TLDs (e.g. `--tld test`). For `.localhost`, set `PORTLESS_SYNC_HOSTS=1` to enable.
+Auto-syncs `/etc/hosts` for route hostnames by default. Set `PORTLESS_SYNC_HOSTS=0` to disable.
 
 ### Browser shows certificate warning with --https
 

@@ -9,7 +9,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { createSNICallback, ensureCerts, isCATrusted, trustCA } from "./certs.js";
 import { createHttpRedirectServer, createProxyServer } from "./proxy.js";
 import { fixOwnership, formatUrl, isErrnoException, parseHostname } from "./utils.js";
-import { syncHostsFile, cleanHostsFile } from "./hosts.js";
+import { syncHostsFile, cleanHostsFile, shouldAutoSyncHosts } from "./hosts.js";
 import { FILE_MODE, RouteConflictError, RouteStore } from "./routes.js";
 import { inferProjectName, detectWorktreePrefix, truncateLabel } from "./auto.js";
 import {
@@ -375,11 +375,7 @@ function startProxyServer(
   let watcher: fs.FSWatcher | null = null;
   let pollingInterval: ReturnType<typeof setInterval> | null = null;
 
-  const syncVal = process.env.PORTLESS_SYNC_HOSTS;
-  const autoSyncHosts =
-    syncVal === "1" ||
-    syncVal === "true" ||
-    (tld !== DEFAULT_TLD && !activeLanIp && syncVal !== "0" && syncVal !== "false");
+  const autoSyncHosts = shouldAutoSyncHosts(process.env.PORTLESS_SYNC_HOSTS);
 
   const onMdnsError = (msg: string) => console.warn(chalk.yellow(msg));
 
@@ -1265,7 +1261,7 @@ ${colors.bold("Environment variables:")}
   PORTLESS_LAN=1                Enable LAN mode when set to 1 (set in .bashrc / .zshrc)
   PORTLESS_TLD=<tld>            Use a custom TLD (e.g. test, dev; default: localhost)
   PORTLESS_WILDCARD=1           Allow unregistered subdomains to fall back to parent route
-  PORTLESS_SYNC_HOSTS=1         Auto-sync ${HOSTS_DISPLAY} (auto-enabled for custom TLDs)
+  PORTLESS_SYNC_HOSTS=0         Disable auto-sync of ${HOSTS_DISPLAY} (on by default)
   PORTLESS_STATE_DIR=<path>     Override the state directory
   PORTLESS=0                    Run command directly without proxy
 
@@ -1278,8 +1274,8 @@ ${colors.bold("Child process environment:")}
 ${colors.bold("Safari / DNS:")}
   .localhost subdomains auto-resolve in Chrome, Firefox, and Edge.
   Safari relies on the system DNS resolver, which may not handle them.
-  Auto-syncs ${HOSTS_DISPLAY} for custom TLDs (e.g. --tld test). For .localhost,
-  set PORTLESS_SYNC_HOSTS=1 to enable. To manually sync:
+  Auto-syncs ${HOSTS_DISPLAY} for route hostnames by default (including .localhost,
+  custom TLDs, and LAN .local). Set PORTLESS_SYNC_HOSTS=0 to disable. To manually sync:
     ${colors.cyan("portless hosts sync")}
   Clean up later with:
     ${colors.cyan("portless hosts clean")}
@@ -1493,8 +1489,8 @@ ${colors.bold("Usage:")}
   ${colors.cyan("portless hosts clean")}   Remove portless entries from ${HOSTS_DISPLAY}
 
 ${colors.bold("Auto-sync:")}
-  Auto-enabled for custom TLDs (e.g. --tld test). For .localhost, set
-  PORTLESS_SYNC_HOSTS=1 to enable. Disable with PORTLESS_SYNC_HOSTS=0.
+  The proxy updates ${HOSTS_DISPLAY} for route hostnames by default. Disable with
+  PORTLESS_SYNC_HOSTS=0.
 `);
     process.exit(0);
   }

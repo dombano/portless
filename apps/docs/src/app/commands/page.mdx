@@ -126,7 +126,7 @@ portless proxy start
     </tr>
     <tr>
       <td>`--tld <tld>`</td>
-      <td>Use a custom TLD instead of `.localhost` (e.g. `test`). Auto-syncs `/etc/hosts` for custom TLDs.</td>
+      <td>Use a custom TLD instead of `.localhost` (e.g. `test`). Hostnames still sync to `/etc/hosts` by default.</td>
     </tr>
     <tr>
       <td>`--cert <path>`</td>
@@ -190,7 +190,7 @@ portless hosts sync     # add current routes to /etc/hosts
 portless hosts clean    # remove portless entries from /etc/hosts
 ```
 
-Auto-enabled for custom TLDs. For `.localhost`, set `PORTLESS_SYNC_HOSTS=1` to enable.
+Auto-sync is on by default. Set `PORTLESS_SYNC_HOSTS=0` to disable.
 
 ## Bypass portless
 
