@@ -17,8 +17,6 @@
 
 ## 0.9.6
 
-<!-- release:start -->
-
 ### Bug Fixes
 
 - **WebSocket proxy memory leak**: Add socket close/end handlers to prevent memory leaks in the WebSocket proxy (#208)
@@ -26,11 +24,8 @@
 ### Contributors
 
 - @ctate
-<!-- release:end -->
 
 ## 0.9.5
-
-<!-- release:start -->
 
 ### Bug Fixes
 
@@ -40,11 +35,8 @@
 ### Contributors
 
 - @ctate
-<!-- release:end -->
 
 ## 0.9.4
-
-<!-- release:start -->
 
 ### Bug Fixes
 
@@ -53,7 +45,6 @@
 ### Contributors
 
 - @ctate
-<!-- release:end -->
 
 ## 0.9.3
 
