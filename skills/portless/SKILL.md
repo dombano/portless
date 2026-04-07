@@ -178,6 +178,7 @@ LAN mode depends on the system mDNS helpers that portless launches: macOS includ
 | `portless get <name> --no-worktree`    | Print URL without worktree prefix                              |
 | `portless list`                        | Show active routes                                             |
 | `portless trust`                       | Add local CA to system trust store (for HTTPS)                 |
+| `portless clean`                       | Remove state, CA trust entry, and /etc/hosts block             |
 | `portless proxy start`                 | Start HTTPS proxy as a daemon (port 443, auto-elevates)        |
 | `portless proxy start --no-tls`        | Start without HTTPS (plain HTTP on port 80)                    |
 | `portless proxy start --lan`           | Start in LAN mode (mDNS `.local`, auto-follows LAN IP changes) |
@@ -196,10 +197,10 @@ LAN mode depends on the system mDNS helpers that portless launches: macOS includ
 | `portless --name <name> <cmd>`         | Force `<name>` as app name (bypasses subcommand dispatch)      |
 | `portless <name> -- <cmd> [args...]`   | Stop flag parsing; everything after `--` is passed to child    |
 | `portless --help` / `-h`               | Show help                                                      |
-| `portless run --help`                  | Show help for a subcommand (also: alias, hosts)                |
+| `portless run --help`                  | Show help for a subcommand (also: alias, hosts, clean)         |
 | `portless --version` / `-v`            | Show version                                                   |
 
-**Reserved names:** `run`, `get`, `alias`, `hosts`, `list`, `trust`, and `proxy` are subcommands and cannot be used as app names directly. Use `portless run <cmd>` to infer the name, or `portless --name <name> <cmd>` to force any name including reserved ones.
+**Reserved names:** `run`, `get`, `alias`, `hosts`, `list`, `trust`, `clean`, and `proxy` are subcommands and cannot be used as app names directly. Use `portless run <cmd>` to infer the name, or `portless --name <name> <cmd>` to force any name including reserved ones.
 
 ## Troubleshooting
 
@@ -260,6 +261,14 @@ portless trust
 ```
 
 This adds the portless local CA to your system trust store. After that, restart the browser.
+
+### Remove portless from the machine
+
+```bash
+portless clean
+```
+
+Stops the proxy if needed, removes the portless CA from the trust store (when portless added it), deletes known files under state directories, and removes the portless `/etc/hosts` block. May require `sudo` on macOS/Linux.
 
 ### Proxy loop (508 Loop Detected)
 
