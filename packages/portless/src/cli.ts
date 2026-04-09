@@ -963,6 +963,19 @@ async function runApp(
     )
   );
 
+  // Point Node.js at the portless CA so server-side fetches (e.g. Next.js
+  // Server Components) trust portless-proxied HTTPS services. Node.js does
+  // not use the system trust store, so without this env var it rejects the
+  // portless CA as "self-signed certificate in certificate chain".
+  // Respect any value the user already set.
+  const caEnv: Record<string, string> = {};
+  if (tls && !process.env.NODE_EXTRA_CA_CERTS) {
+    const caPath = path.join(stateDir, "ca.pem");
+    if (fs.existsSync(caPath)) {
+      caEnv.NODE_EXTRA_CA_CERTS = caPath;
+    }
+  }
+
   spawnCommand(commandArgs, {
     env: {
       ...process.env,
@@ -974,6 +987,7 @@ async function runApp(
       // baked-in pinging, making this env var ineffective. Expo handles its
       // own LAN discovery natively.
       ...(lanMode ? { PORTLESS_LAN: "1" } : {}),
+      ...caEnv,
     },
     onCleanup: () => {
       try {
@@ -1272,6 +1286,7 @@ ${colors.bold("Child process environment:")}
   HOST                          Usually 127.0.0.1 (omitted for Expo in LAN mode)
   PORTLESS_URL                  Public URL of the app (e.g. https://myapp.localhost)
   PORTLESS_LAN                  Set to 1 when proxy is in LAN mode
+  NODE_EXTRA_CA_CERTS           Path to the portless CA (set when HTTPS is active)
 
 ${colors.bold("Safari / DNS:")}
   .localhost subdomains auto-resolve in Chrome, Firefox, and Edge.
