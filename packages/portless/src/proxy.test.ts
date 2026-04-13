@@ -1378,8 +1378,9 @@ describe("createProxyServer with TLS (HTTP/2)", () => {
 
   // streamResetBurst/streamResetRate server options require Node 22.11+;
   // on older versions they are silently ignored and GOAWAY fires at ~1000 resets.
+  // Also skipped on Windows where the rapid burst overwhelms the test backend.
   const [nodeMajor, nodeMinor] = process.versions.node.split(".").map(Number);
-  it.skipIf(nodeMajor < 22 || (nodeMajor === 22 && nodeMinor < 11))(
+  it.skipIf(nodeMajor < 22 || (nodeMajor === 22 && nodeMinor < 11) || process.platform === "win32")(
     "session survives sustained stream cancellation (issues #217, #221)",
     async () => {
       const backend = trackServer(
