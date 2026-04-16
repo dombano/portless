@@ -654,6 +654,9 @@ async function stopProxy(store: RouteStore, proxyPort: number, _tls: boolean): P
     if (isNaN(pid)) {
       console.error(colors.red("Corrupted PID file. Removing it."));
       fs.unlinkSync(pidPath);
+      writeTlsMarker(store.dir, false);
+      writeTldFile(store.dir, DEFAULT_TLD);
+      writeLanMarker(store.dir, null);
       return;
     }
 
