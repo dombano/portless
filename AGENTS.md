@@ -77,4 +77,4 @@ Run a command on W
 
 ## Personal Notes
 
-<!-- Personal fork: I primarily use this on macOS with Node 20. Haven't tested the Windows debugging workflow yet. -->
+<!-- Personal fork: I primarily use this on macOS with Node 20. The Windows debugging section is upstream infrastructure I don't have access to; skip those steps. -->
